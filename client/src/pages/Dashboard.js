@@ -1,76 +1,94 @@
 // src/pages/Dashboard.js
 import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import api from '../utils/api';
 
 const Dashboard = () => {
   const [userCompanies, setUserCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  // Default user stats to avoid undefined errors
+  const [userStats, setUserStats] = useState({
+    money: 0,
+    level: 1,
+    experience: 0,
+    xpForNextLevel: 100,
+    xpProgress: 0,
+    weeklyExpenses: 0
+  });
   const { user } = useContext(AuthContext);
 
   useEffect(() => {
-    const fetchUserCompanies = async () => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError('');
+      
       try {
-        const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/companies/user`, { 
-          withCredentials: true 
-        });
+        // Set a timeout to prevent infinite loading
+        const timeoutId = setTimeout(() => {
+          setLoading(false);
+        }, 10000); // 10 seconds max loading time
         
-        // For each company, fetch wrestler count
-        const companiesWithWrestlers = await Promise.all(
-          res.data.map(async (company) => {
-            try {
-              const wrestlersRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/wrestlers/company/${company._id}`);
-              
-              // Get show count
-              const showsRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/shows/company/${company._id}`);
-              
-              return {
-                ...company,
-                wrestlers: wrestlersRes.data,
-                shows: showsRes.data
-              };
-            } catch (err) {
-              console.error(`Error fetching data for company ${company._id}:`, err);
-              return {
-                ...company,
-                wrestlers: [],
-                shows: []
-              };
-            }
-          })
-        );
+        // First, try to fetch companies (basic functionality)
+        try {
+          const companiesRes = await api.get('/api/companies/user');
+          const companiesData = companiesRes.data || [];
+          
+          // For each company, try to get roster size
+          const companiesWithInfo = await Promise.all(
+            companiesData.map(async (company) => {
+              try {
+                // Get roster size (just count, don't fetch all details)
+                const rosterRes = await api.get(`/api/wrestlers/company/${company._id}`);
+                return {
+                  ...company,
+                  rosterSize: rosterRes.data?.length || 0
+                };
+              } catch (err) {
+                console.error(`Error fetching roster for company ${company._id}:`, err);
+                return {
+                  ...company,
+                  rosterSize: 'Unknown'
+                };
+              }
+            })
+          );
+          
+          setUserCompanies(companiesWithInfo);
+        } catch (companiesErr) {
+          console.error('Error fetching companies:', companiesErr);
+          setUserCompanies([]);
+        }
         
-        setUserCompanies(companiesWithWrestlers);
+        // Then try to fetch user stats (can fail without breaking the page)
+        try {
+          const statsRes = await api.get('/api/auth/stats');
+          if (statsRes.data) {
+            setUserStats(statsRes.data);
+          }
+        } catch (statsErr) {
+          console.error('Error fetching user stats:', statsErr);
+          // Keep default stats - no need to show error
+        }
+        
+        // Clear timeout if everything completes
+        clearTimeout(timeoutId);
+        setLoading(false);
       } catch (err) {
-        console.error('Error fetching user companies:', err);
-      } finally {
+        console.error('General error in Dashboard:', err);
+        setError('Something went wrong. Please try again.');
         setLoading(false);
       }
     };
-  
-    fetchUserCompanies();
+
+    fetchData();
   }, []);
 
   // Helper function to calculate weekly expenses for a company
   const calculateWeeklyExpenses = (company) => {
-    if (!company.wrestlers) return 0;
-    
-    // Calculate total weekly salary for all wrestlers
-    const totalSalary = company.wrestlers.reduce((sum, wrestler) => sum + (wrestler.salary || 0), 0);
-    
-    // Add any other weekly expenses (venues, etc.)
-    const otherExpenses = 0; // You can add more expenses here
-    
-    return totalSalary + otherExpenses;
-  };
-
-  // Helper function to count upcoming shows
-  const countUpcomingShows = (company) => {
-    if (!company.shows) return 0;
-    
-    const now = new Date();
-    return company.shows.filter(show => new Date(show.date) > now).length;
+    // Simple estimation based on roster size
+    return (company.rosterSize || 0) * 10000;
   };
 
   if (loading) {
@@ -81,7 +99,15 @@ const Dashboard = () => {
             <span className="visually-hidden">Loading...</span>
           </div>
         </div>
-        <p className="text-center mt-3">Loading your companies...</p>
+        <p className="text-center mt-3">Loading your dashboard...</p>
+        <div className="text-center mt-2">
+          <button 
+            className="btn btn-sm btn-outline-secondary"
+            onClick={() => setLoading(false)}
+          >
+            Skip Loading
+          </button>
+        </div>
       </div>
     );
   }
@@ -90,30 +116,87 @@ const Dashboard = () => {
     <div className="container my-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="mb-0">Dashboard</h1>
-        <Link
-          to="/create-company"
-          className="btn btn-success"
-        >
-          Create New Company
-        </Link>
+        <div>
+          <Link to="/profile" className="btn btn-outline-primary me-2">
+            My Profile
+          </Link>
+          <Link
+            to="/create-company"
+            className={`btn btn-success ${userStats?.money < 200000 ? 'disabled' : ''}`}
+          >
+            {userStats?.money < 200000 
+              ? `Need $${(200000 - userStats.money).toLocaleString()} for Company` 
+              : 'Create New Company'}
+          </Link>
+        </div>
       </div>
+      
+      {/* Show payout notification if exists */}
+      {userStats?.payout && (
+        <div className="alert alert-success alert-dismissible fade show" role="alert">
+          <strong>Daily Payout!</strong> {userStats.payout.message}
+          <button type="button" className="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      )}
 
-      {/* User Profile Card */}
+      {error && (
+        <div className="alert alert-danger alert-dismissible fade show" role="alert">
+          {error}
+          <button type="button" className="btn-close" onClick={() => setError('')}></button>
+        </div>
+      )}
+
+      {/* User Stats Card */}
       <div className="card mb-4">
         <div className="card-header bg-primary text-white">
-          <h4 className="mb-0">User Profile</h4>
+          <h4 className="mb-0">Promoter Dashboard</h4>
         </div>
         <div className="card-body">
-          <div className="d-flex align-items-center">
-            <img 
-              src={user.avatar || 'https://via.placeholder.com/100'} 
-              alt="Avatar" 
-              className="rounded-circle me-4" 
-              style={{width: '100px', height: '100px', objectFit: 'cover'}} 
-            />
-            <div>
-              <h2 className="mb-1">{user.username}</h2>
-              <p className="text-muted mb-0">Member since {new Date(user.createdAt).toLocaleDateString()}</p>
+          <div className="row">
+            <div className="col-md-2 text-center">
+              <img 
+                src={user.avatar || 'https://via.placeholder.com/100'} 
+                alt="Avatar" 
+                className="rounded-circle mb-2" 
+                style={{width: '80px', height: '80px', objectFit: 'cover'}} 
+              />
+            </div>
+            <div className="col-md-5">
+              <h3 className="mb-1">{user.username}</h3>
+              <div className="text-muted mb-2">Level {userStats?.level || 1} Promoter</div>
+              
+              <div className="progress mb-1" style={{ height: '8px' }}>
+                <div 
+                  className="progress-bar bg-success" 
+                  style={{ width: `${userStats?.xpProgress || 0}%` }}
+                ></div>
+              </div>
+              <div className="d-flex justify-content-between small text-muted">
+                <span>{userStats?.experience || 0} XP</span>
+                <span>{userStats?.xpForNextLevel || 100} XP needed</span>
+              </div>
+            </div>
+            <div className="col-md-5">
+              <div className="card h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h5 className="mb-0">Available Funds</h5>
+                    <span className="h3 mb-0 text-success">${userStats?.money.toLocaleString() || 0}</span>
+                  </div>
+                  <div className="d-flex justify-content-between mb-2">
+                    <span>Companies</span>
+                    <span>{userCompanies.length}</span>
+                  </div>
+                  <div className="d-flex justify-content-between mb-2">
+  <span>Wrestlers</span>
+  <span>{userStats?.wrestlerCount || userStats?.wrestlers?.length || 0}</span>
+</div>
+                  <div className="d-flex justify-content-between">
+                    <span>Weekly Expenses</span>
+                    <span className="text-danger">-${userStats?.weeklyExpenses?.toLocaleString() || 0}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -128,9 +211,11 @@ const Dashboard = () => {
           <div>
             <Link
               to="/create-company"
-              className="btn btn-primary"
+              className={`btn btn-primary ${userStats?.money < 200000 ? 'disabled' : ''}`}
             >
-              Create Your First Company
+              {userStats?.money < 200000 
+                ? `Need $${(200000 - userStats?.money).toLocaleString()} more` 
+                : 'Create Your First Company'}
             </Link>
           </div>
         </div>
@@ -182,36 +267,21 @@ const Dashboard = () => {
                   </div>
                   
                   <div className="row mb-3">
-                    <div className="col-md-4 mb-2 mb-md-0">
+                    <div className="col-md-6 mb-2 mb-md-0">
                       <div className="card text-center h-100">
                         <div className="card-body p-2">
-                          <h5 className="mb-1">${company.money?.toLocaleString()}</h5>
+                          <h5 className="mb-1">${company.money?.toLocaleString() || 0}</h5>
                           <div className="small text-muted">Available Funds</div>
                         </div>
                       </div>
                     </div>
-                    <div className="col-md-4 mb-2 mb-md-0">
+                    <div className="col-md-6">
                       <div className="card text-center h-100">
                         <div className="card-body p-2">
-                          <h5 className="mb-1">{company.wrestlers?.length || 0}</h5>
+                          <h5 className="mb-1">{company.rosterSize || 'Unknown'}</h5>
                           <div className="small text-muted">Wrestlers</div>
                         </div>
                       </div>
-                    </div>
-                    <div className="col-md-4">
-                      <div className="card text-center h-100">
-                        <div className="card-body p-2">
-                          <h5 className="mb-1">{countUpcomingShows(company)}</h5>
-                          <div className="small text-muted">Upcoming Shows</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mb-3">
-                    <div className="d-flex justify-content-between mb-1">
-                      <span>Weekly Expenses:</span>
-                      <span className="text-danger">-${calculateWeeklyExpenses(company).toLocaleString()}</span>
                     </div>
                   </div>
                   
@@ -278,16 +348,25 @@ const Dashboard = () => {
             </div>
             <div className="card-body">
               <div className="list-group">
+                <Link to="/wrestlers/new" className="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                  Create a Wrestler
+                  <span className="badge bg-success rounded-pill">
+                    <i className="bi bi-person-plus"></i>
+                  </span>
+                </Link>
                 <Link to="/shows/new" className="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                   Schedule a Show
                   <span className="badge bg-success rounded-pill">
                     <i className="bi bi-calendar-plus"></i>
                   </span>
                 </Link>
-                <Link to="/create-company" className="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                  Start a New Company
+                <Link 
+                  to="/profile" 
+                  className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                >
+                  View My Profile
                   <span className="badge bg-success rounded-pill">
-                    <i className="bi bi-plus-circle"></i>
+                    <i className="bi bi-person"></i>
                   </span>
                 </Link>
               </div>

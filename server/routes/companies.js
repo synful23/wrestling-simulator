@@ -32,13 +32,30 @@ router.post('/', isAuthenticated, upload.single('logo'), async (req, res) => {
     if (existingCompany) {
       return res.status(400).json({ message: 'A company with that name already exists' });
     }
+    
+    // Get full user with methods
+    const user = await User.findById(req.user.id);
+    
+    // Cost to create a company
+    const companyCost = 200000; // $200,000
+    
+    // Check if user has enough money
+    if (!user.canCreateCompany(companyCost)) {
+      return res.status(400).json({ 
+        message: `You need $${companyCost.toLocaleString()} to create a company. You have $${user.money.toLocaleString()}.`
+      });
+    }
+    
+    // Deduct the cost
+    user.money -= companyCost;
 
     // Create new company
     const newCompany = new Company({
       name,
       location,
       description,
-      owner: req.user.id
+      owner: user._id,
+      money: 100000 // Starting company money
     });
 
     // If logo was uploaded, add it to the company
@@ -50,11 +67,30 @@ router.post('/', isAuthenticated, upload.single('logo'), async (req, res) => {
     await newCompany.save();
 
     // Add company to user's companies array
-    await User.findByIdAndUpdate(req.user.id, {
-      $push: { companies: newCompany._id }
-    });
+    user.companies.push(newCompany._id);
+    
+    // Add achievement for creating a company
+    await user.addAchievement(
+      'company_created',
+      `Created a new wrestling company: ${name}`,
+      50000 // $50,000 bonus for creating first company
+    );
+    
+    // Save user
+    await user.save();
+    
+    // Attempt to send Discord webhook notification
+    try {
+      await discordWebhook.notifyNewCompany(newCompany, user);
+    } catch (webhookErr) {
+      console.error('Error sending webhook notification:', webhookErr);
+      // Continue anyway - webhook is not critical
+    }
 
-    res.status(201).json(newCompany);
+    res.status(201).json({ 
+      company: newCompany,
+      userMoney: user.money
+    });
   } catch (err) {
     console.error('Error creating company:', err);
     res.status(500).json({ message: 'Server error' });

@@ -1,8 +1,9 @@
 // src/pages/VenueForm.js
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import axios from 'axios';
+import api from '../utils/api';
 
 const VenueForm = () => {
   const { id } = useParams();
@@ -32,15 +33,13 @@ const VenueForm = () => {
       try {
         // Fetch user's companies
         if (user) {
-          const companyRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/companies/user`, { 
-            withCredentials: true 
-          });
+          const companyRes = await api.get('/api/companies/user');
           setUserCompanies(companyRes.data);
         }
         
         // If editing, fetch venue data
         if (id) {
-          const venueRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/venues/${id}`);
+          const venueRes = await api.get(`/api/venues/${id}`);
           const venue = venueRes.data;
           
           setFormData({
@@ -103,6 +102,13 @@ const VenueForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Only allow admins to submit the form
+    if (!user || !user.isAdmin) {
+      setError('You do not have permission to perform this action');
+      return;
+    }
+    
     setLoading(true);
     setError('');
 
@@ -120,22 +126,20 @@ const VenueForm = () => {
       
       if (id) {
         // Update existing venue
-        response = await axios.put(
-          `${process.env.REACT_APP_API_URL}/api/venues/${id}`, 
+        response = await api.put(
+          `/api/venues/${id}`, 
           formDataToSend,
           {
-            headers: { 'Content-Type': 'multipart/form-data' },
-            withCredentials: true
+            headers: { 'Content-Type': 'multipart/form-data' }
           }
         );
       } else {
         // Create new venue
-        response = await axios.post(
-          `${process.env.REACT_APP_API_URL}/api/venues`, 
+        response = await api.post(
+          '/api/venues', 
           formDataToSend,
           {
-            headers: { 'Content-Type': 'multipart/form-data' },
-            withCredentials: true
+            headers: { 'Content-Type': 'multipart/form-data' }
           }
         );
       }
@@ -150,26 +154,174 @@ const VenueForm = () => {
     }
   };
 
-  if (loading && !id) {
-    return <div className="text-center mt-5">Loading...</div>;
-  }
-
-  if (!user) {
+  // Show loading state
+  if (loading) {
     return (
-      <div className="container mt-5">
-        <div className="alert alert-warning">
-          You must be logged in to create or edit venues.
+      <div className="container mt-5 text-center">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
         </div>
+        <p className="mt-2">Loading venue data...</p>
       </div>
     );
   }
 
+  // Non-admin users get a read-only view
+  if (!user || !user.isAdmin) {
+    if (id) {
+      // Show read-only details for an existing venue
+      return (
+        <div className="container my-4">
+          <h1 className="mb-4">Venue Details</h1>
+          
+          {error && (
+            <div className="alert alert-danger alert-dismissible fade show" role="alert">
+              {error}
+              <button type="button" className="btn-close" onClick={() => setError('')}></button>
+            </div>
+          )}
+          
+          <div className="card">
+            <div className="card-header bg-primary text-white">
+              <h3 className="mb-0">{formData.name}</h3>
+            </div>
+            <div className="card-body">
+              <div className="row">
+                <div className="col-md-5">
+                  {imagePreview && (
+                    <div className="mb-4">
+                      <img
+                        src={imagePreview}
+                        alt={formData.name}
+                        className="img-fluid rounded"
+                        style={{ maxHeight: '300px' }}
+                      />
+                    </div>
+                  )}
+                </div>
+                
+                <div className="col-md-7">
+                  <div className="row mb-3">
+                    <div className="col-md-6">
+                      <h5>Location</h5>
+                      <p>{formData.location}</p>
+                    </div>
+                    
+                    <div className="col-md-6">
+                      <h5>Capacity</h5>
+                      <p>{formData.capacity.toLocaleString()} seats</p>
+                    </div>
+                  </div>
+                  
+                  <div className="row mb-3">
+                    <div className="col-md-6">
+                      <h5>Rental Cost</h5>
+                      <p>${formData.rentalCost.toLocaleString()} per event</p>
+                    </div>
+                    
+                    <div className="col-md-6">
+                      <h5>Prestige</h5>
+                      <div className="progress mb-2">
+                        <div 
+                          className="progress-bar bg-success" 
+                          style={{ width: `${formData.prestige}%` }}
+                        ></div>
+                      </div>
+                      <span>{formData.prestige}/100</span>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-3">
+                    <h5>Status</h5>
+                    <p>
+                      {formData.isAvailable ? (
+                        <span className="badge bg-success">Available for Booking</span>
+                      ) : (
+                        <span className="badge bg-danger">Not Available</span>
+                      )}
+                    </p>
+                  </div>
+                  
+                  {formData.description && (
+                    <div className="mb-3">
+                      <h5>Description</h5>
+                      <p>{formData.description}</p>
+                    </div>
+                  )}
+                  
+                  {formData.owner && (
+                    <div className="mb-3">
+                      <h5>Ownership</h5>
+                      <p>This venue is owned by a wrestling company.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Economic details section */}
+              <div className="card mt-4">
+                <div className="card-header bg-light">
+                  <h5 className="mb-0">Venue Economics</h5>
+                </div>
+                <div className="card-body">
+                  <div className="row">
+                    <div className="col-md-4">
+                      <p><strong>Cost per seat:</strong> ${(formData.rentalCost / formData.capacity).toFixed(2)}</p>
+                    </div>
+                    <div className="col-md-4">
+                      <p><strong>Typical Revenue:</strong> ${(formData.capacity * 20).toLocaleString()} (at $20 ticket price)</p>
+                    </div>
+                    <div className="col-md-4">
+                      <p><strong>Profit Potential:</strong> ${((formData.capacity * 20) - formData.rentalCost).toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="small text-muted">
+                    Note: Actual attendance and revenue will depend on your company popularity, ticket prices, and show quality.
+                  </div>
+                </div>
+              </div>
+              
+              {/* Call to action for booking the venue */}
+              {formData.isAvailable && (
+                <div className="mt-4">
+                  <Link 
+                    to={`/shows/new?venue=${id}`} 
+                    className="btn btn-success btn-lg"
+                  >
+                    Book This Venue for a Show
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="mt-3">
+            <button 
+              className="btn btn-secondary"
+              onClick={() => navigate('/venues')}
+            >
+              Back to Venues
+            </button>
+          </div>
+        </div>
+      );
+    } else {
+      // Redirect non-admin users away from the venue creation page
+      navigate('/venues');
+      return null;
+    }
+  }
+
+  // Admin user - Show editable form
   return (
     <div className="container my-4">
       <h1 className="mb-4">{id ? 'Edit Venue' : 'Create Venue'}</h1>
       
       {error && (
-        <div className="alert alert-danger">{error}</div>
+        <div className="alert alert-danger alert-dismissible fade show" role="alert">
+          {error}
+          <button type="button" className="btn-close" onClick={() => setError('')}></button>
+        </div>
       )}
       
       <div className="card form-container">

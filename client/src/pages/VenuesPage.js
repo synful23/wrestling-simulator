@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import axios from 'axios';
+import api from '../utils/api';
 
 const VenuesPage = () => {
   const { user } = useContext(AuthContext);
@@ -15,16 +15,17 @@ const VenuesPage = () => {
   const [sortBy, setSortBy] = useState('capacity');
   const [sortOrder, setSortOrder] = useState('desc');
   const [userCompanies, setUserCompanies] = useState([]);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   
   useEffect(() => {
     const fetchVenues = async () => {
       try {
-        const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/venues?available=true`);
+        const res = await api.get(`${process.env.REACT_APP_API_URL}/api/venues?available=true`);
         setVenues(res.data);
         
         // If user is logged in, get their companies
         if (user) {
-          const companiesRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/companies/user`, { 
+          const companiesRes = await api.get(`${process.env.REACT_APP_API_URL}/api/companies/user`, { 
             withCredentials: true 
           });
           setUserCompanies(companiesRes.data);
@@ -59,6 +60,30 @@ const VenuesPage = () => {
   const toggleSortOrder = () => {
     setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
   };
+
+    // Add the missing handleDeleteVenue function
+    const handleDeleteVenue = (venueId) => {
+      // Set the venueId to delete and show confirmation
+      setDeleteConfirm(venueId);
+    };
+  
+    // Function to confirm deletion
+    const confirmDeleteVenue = async () => {
+      try {
+        if (!deleteConfirm) return;
+        
+        await api.delete(`/api/venues/${deleteConfirm}`);
+        
+        // Remove venue from state
+        setVenues(venues.filter(venue => venue._id !== deleteConfirm));
+        
+        // Clear the confirmation
+        setDeleteConfirm(null);
+      } catch (err) {
+        console.error('Error deleting venue:', err);
+        setError(err.response?.data?.message || 'Failed to delete venue');
+      }
+    };
 
   const getUniqueLocations = () => {
     const locations = venues.map(venue => venue.location.split(',')[1]?.trim() || venue.location).filter(Boolean);
@@ -105,14 +130,14 @@ const VenuesPage = () => {
   return (
     <div className="container my-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1>Venues</h1>
-        
-        {user && (
-          <Link to="/venues/new" className="btn btn-success">
-            Create Venue
-          </Link>
-        )}
-      </div>
+  <h1>Venues</h1>
+  
+  {user && user.isAdmin && (
+    <Link to="/venues/new" className="btn btn-success">
+      Create Venue
+    </Link>
+  )}
+</div>
       
       {error && (
         <div className="alert alert-danger">{error}</div>
@@ -225,16 +250,33 @@ const VenuesPage = () => {
                     </div>
                     
                     <div className="card-footer d-flex justify-content-between">
-                      <Link to={`/venues/${venue._id}`} className="btn btn-sm btn-outline-primary">
-                        View Details
-                      </Link>
-                      
-                      {user && userCompanies.length > 0 && (
-                        <Link to={`/shows/new?venue=${venue._id}`} className="btn btn-sm btn-success">
-                          Book Venue
-                        </Link>
-                      )}
-                    </div>
+  <Link to={`/venues/${venue._id}`} className="btn btn-sm btn-outline-primary">
+    View Details
+  </Link>
+  
+  {user && user.isAdmin && (
+    <div>
+      <Link 
+        to={`/venues/edit/${venue._id}`} 
+        className="btn btn-sm btn-outline-secondary me-2"
+      >
+        Edit
+      </Link>
+      <button
+        className="btn btn-sm btn-outline-danger"
+        onClick={() => handleDeleteVenue(venue._id)}
+      >
+        Delete
+      </button>
+    </div>
+  )}
+  
+  {user && userCompanies.length > 0 && venue.isAvailable && (
+    <Link to={`/shows/new?venue=${venue._id}`} className="btn btn-sm btn-success">
+      Book Venue
+    </Link>
+  )}
+</div>
                   </div>
                 </div>
               ))}
