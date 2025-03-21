@@ -278,12 +278,6 @@ const Dashboard = () => {
             </div>
             <div className="card-body">
               <div className="list-group">
-                <Link to="/wrestlers/new" className="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                  Create a Wrestler
-                  <span className="badge bg-success rounded-pill">
-                    <i className="bi bi-person-plus"></i>
-                  </span>
-                </Link>
                 <Link to="/shows/new" className="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                   Schedule a Show
                   <span className="badge bg-success rounded-pill">

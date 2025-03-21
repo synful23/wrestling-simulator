@@ -2,7 +2,10 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import api from '../utils/api';
 import axios from 'axios';
+
+const TIMEOUT_MS = 10000; // 10 seconds timeout
 
 const FreeAgents = () => {
   const { user } = useContext(AuthContext);
@@ -26,24 +29,69 @@ const FreeAgents = () => {
   
   const wrestlingStyles = ['Technical', 'High-Flyer', 'Powerhouse', 'Brawler', 'Showman', 'All-Rounder'];
   
+  // Helper function with timeout for API calls
+  const fetchWithTimeout = async (url, options = {}) => {
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timed out')), TIMEOUT_MS)
+    );
+    
+    try {
+      const fetchPromise = axios.get(url, { 
+        ...options,
+        withCredentials: true 
+      });
+      
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
+      return response.data;
+    } catch (error) {
+      console.error(`Request to ${url} failed:`, error);
+      if (error.message === 'Request timed out') {
+        throw new Error('Request timed out. The server took too long to respond.');
+      }
+      throw error;
+    }
+  };
+  
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Get all wrestlers without contracts
-        const result = await axios.get(`${process.env.REACT_APP_API_URL}/api/wrestlers`);
-        const freeAgents = result.data.filter(wrestler => !wrestler.contract || !wrestler.contract.company);
-        setWrestlers(freeAgents);
+        console.log("FreeAgents: Starting data fetch...");
+        setLoading(true);
+        setError('');
+        
+        // Get all wrestlers
+        try {
+          console.log("FreeAgents: Fetching wrestlers...");
+          const result = await fetchWithTimeout(`${process.env.REACT_APP_API_URL}/api/wrestlers`);
+          
+          console.log(`FreeAgents: Received ${result.length} wrestlers, filtering free agents...`);
+          
+          // Filter to only free agents
+          const freeAgents = result.filter(wrestler => !wrestler.contract || !wrestler.contract.company);
+          console.log(`FreeAgents: Found ${freeAgents.length} free agents`);
+          
+          setWrestlers(freeAgents);
+        } catch (wrestlerErr) {
+          console.error('FreeAgents: Error fetching wrestlers:', wrestlerErr);
+          setError(wrestlerErr.message || 'Failed to load free agents. Please try again.');
+          setWrestlers([]);
+        }
         
         // If user is logged in, get their companies
         if (user) {
-          const companiesRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/companies/user`, { 
-            withCredentials: true 
-          });
-          setUserCompanies(companiesRes.data);
+          try {
+            console.log("FreeAgents: User is logged in, fetching companies...");
+            const companiesRes = await api.get('/api/companies/user');
+            console.log("FreeAgents: User companies received:", companiesRes.data);
+            setUserCompanies(companiesRes.data || []);
+          } catch (companyErr) {
+            console.error('FreeAgents: Error fetching user companies:', companyErr);
+            setUserCompanies([]);
+          }
         }
       } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load free agents. Please try again.');
+        console.error('FreeAgents: General error in data fetching:', err);
+        setError('Failed to load data. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -109,24 +157,21 @@ const FreeAgents = () => {
         return;
       }
 
-      await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/wrestlers/${signingWrestler._id}/sign/${signingCompany}`,
+      await api.post(
+        `/api/wrestlers/${signingWrestler._id}/sign/${signingCompany}`,
         {
           contractLength: signingContract.length,
           exclusive: signingContract.exclusive
-        },
-        { withCredentials: true }
+        }
       );
 
       // Refresh the free agents list
-      const result = await axios.get(`${process.env.REACT_APP_API_URL}/api/wrestlers`);
+      const result = await api.get('/api/wrestlers');
       const freeAgents = result.data.filter(wrestler => !wrestler.contract || !wrestler.contract.company);
       setWrestlers(freeAgents);
 
       // Refresh user companies
-      const companiesRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/companies/user`, { 
-        withCredentials: true 
-      });
+      const companiesRes = await api.get('/api/companies/user');
       setUserCompanies(companiesRes.data);
 
       closeSignModal();
@@ -176,7 +221,21 @@ const FreeAgents = () => {
     });
 
   if (loading) {
-    return <div className="text-center mt-5">Loading free agents...</div>;
+    return (
+      <div className="container mt-5 text-center">
+        <div className="spinner-border text-primary mb-3" role="status">
+          <span className="visually-hidden">Loading free agents...</span>
+        </div>
+        <h4>Loading free agents...</h4>
+        <p className="text-muted">This might take a few moments</p>
+        <button 
+          className="btn btn-outline-secondary mt-3"
+          onClick={() => setLoading(false)}
+        >
+          Cancel Loading
+        </button>
+      </div>
+    );
   }
 
   return (

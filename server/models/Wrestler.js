@@ -108,6 +108,8 @@ const WrestlerSchema = new mongoose.Schema(
   }
 );
 
+WrestlerSchema.index({ 'contract.company': 1 });
+
 // Virtual for overall rating
 WrestlerSchema.virtual('overallRating').get(function() {
   const { strength, agility, charisma, technical } = this.attributes;

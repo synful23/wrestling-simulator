@@ -2,17 +2,20 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import api from '../utils/api';
 import axios from 'axios';
+
+const TIMEOUT_MS = 10000; // 10 seconds timeout
 
 const RosterPage = () => {
   const { companyId } = useParams();
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   
-  const [company, setCompany] = useState(null);
-  const [wrestlers, setWrestlers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+const [wrestlers, setWrestlers] = useState([]);
+const [company, setCompany] = useState(null);
+const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStyle, setFilterStyle] = useState('');
   const [sortBy, setSortBy] = useState('popularity');
@@ -20,26 +23,68 @@ const RosterPage = () => {
   
   const wrestlingStyles = ['Technical', 'High-Flyer', 'Powerhouse', 'Brawler', 'Showman', 'All-Rounder'];
   
+  // Helper function with timeout for API calls
+  const fetchWithTimeout = async (url, options = {}) => {
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timed out')), TIMEOUT_MS)
+    );
+    
+    try {
+      const fetchPromise = axios.get(url, { 
+        ...options,
+        withCredentials: true 
+      });
+      
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
+      return response.data;
+    } catch (error) {
+      console.error(`Request to ${url} failed:`, error);
+      if (error.message === 'Request timed out') {
+        throw new Error('Request timed out. The server took too long to respond.');
+      }
+      throw error;
+    }
+  };
+  
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch company details
-        const companyRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/companies/${companyId}`);
-        setCompany(companyRes.data);
+        setLoading(true);
+        setError('');
+        console.log(`RosterPage: Fetching data for company ${companyId}...`);
         
-        // Fetch company's wrestlers
-        const wrestlersRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/wrestlers/company/${companyId}`);
-        setWrestlers(wrestlersRes.data);
+        // Fetch company data
+        const companyResponse = await api.get(`/api/companies/${companyId}`);
+        setCompany(companyResponse.data);
+        
+        // Now fetch wrestlers
+        try {
+          const apiUrl = `${process.env.REACT_APP_API_URL}/api/wrestlers/company/${companyId}`;
+          const wrestlersData = await axios.get(apiUrl, { withCredentials: true });
+          setWrestlers(wrestlersData.data || []);
+        } catch (wrestlerErr) {
+          console.error('Error fetching wrestlers:', wrestlerErr);
+          setWrestlers([]);
+          // Don't let wrestler errors block the whole page
+        }
       } catch (err) {
-        console.error('Error fetching data:', err);
+        console.error('Error fetching company data:', err);
         setError('Failed to load roster data. Please try again.');
       } finally {
+        // Always set loading to false when done
         setLoading(false);
       }
     };
-
+  
     fetchData();
   }, [companyId]);
+  
+  // Helper to update the main loading state based on sub-states
+  const updateLoadingState = () => {
+    if (!loading) {
+      setLoading(false);
+    }
+  };
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
@@ -90,11 +135,28 @@ const RosterPage = () => {
       return 0;
     });
 
+  // Show loading UI with cancelable option
   if (loading) {
-    return <div className="text-center mt-5">Loading roster...</div>;
+    return (
+      <div className="container mt-5 text-center">
+        <div className="spinner-border text-primary mb-3" role="status">
+          <span className="visually-hidden">Loading roster...</span>
+        </div>
+        <h4>Loading roster data...</h4>
+        <p className="text-muted">This might take a few moments</p>
+        <button 
+          className="btn btn-outline-secondary mt-3"
+          onClick={() => {
+            setLoading(false);
+          }}
+        >
+          Cancel Loading
+        </button>
+      </div>
+    );
   }
 
-  if (error) {
+  if (error && !company) {
     return <div className="alert alert-danger mt-5">{error}</div>;
   }
 
@@ -115,6 +177,13 @@ const RosterPage = () => {
           </Link>
         )}
       </div>
+      
+      {error && (
+        <div className="alert alert-danger alert-dismissible fade show" role="alert">
+          {error}
+          <button type="button" className="btn-close" onClick={() => setError('')}></button>
+        </div>
+      )}
       
       <div className="card mb-4">
         <div className="card-body">
@@ -141,7 +210,7 @@ const RosterPage = () => {
                 
                 <div className="col-md-6">
                   <p><strong>Weekly Salary Budget:</strong> ${wrestlers.reduce((sum, wrestler) => sum + wrestler.salary, 0).toLocaleString()}</p>
-                  <p><strong>Available Funds:</strong> ${company.money.toLocaleString()}</p>
+                  <p><strong>Available Funds:</strong> ${company.money?.toLocaleString() || 'Unknown'}</p>
                 </div>
               </div>
             </div>
@@ -196,13 +265,20 @@ const RosterPage = () => {
             </div>
           </div>
           
-          {wrestlers.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-4">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading wrestlers...</span>
+              </div>
+              <p className="mt-2">Loading wrestlers...</p>
+            </div>
+          ) : wrestlers.length === 0 ? (
             <div className="alert alert-info">
               This company doesn't have any wrestlers yet.
               {isCompanyOwner && (
                 <div className="mt-2">
-                  <Link to="/wrestlers/new" className="btn btn-primary btn-sm">
-                    Add your first wrestler
+                  <Link to="/free-agents" className="btn btn-primary btn-sm">
+                    Sign free agents
                   </Link>
                 </div>
               )}

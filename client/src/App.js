@@ -18,6 +18,8 @@ import VenueForm from './pages/VenueForm';
 import ShowsPage from './pages/ShowsPage';
 import ShowForm from './pages/ShowForm';
 import ShowBooking from './pages/ShowBooking';
+import DebugPanel from './components/DebugPanel';
+
 
 
 function App() {
@@ -39,6 +41,7 @@ function App() {
                 <CreateCompany />
               </PrivateRoute>
             } />
+            <Route path="/debug" element={<DebugPanel />} />
             <Route path="/companies" element={<Companies />} />
             <Route path="/wrestlers/new" element={
   <PrivateRoute>

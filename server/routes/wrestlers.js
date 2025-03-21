@@ -1,4 +1,4 @@
-// routes/wrestlers.js - Update to use admin middleware
+// server/routes/wrestlers.js - Optimized version
 const express = require('express');
 const router = express.Router();
 const Wrestler = require('../models/Wrestler');
@@ -7,6 +7,139 @@ const Company = require('../models/Company');
 const upload = require('../middleware/upload');
 const { isAuthenticated, isAdmin, canManageWrestler } = require('../middleware/auth');
 const discordWebhook = require('../utils/discordWebhook');
+const mongoose = require('mongoose');
+
+// Add index to improve query performance
+if (!Wrestler.schema.indexes().some(idx => idx[0]['contract.company'] === 1)) {
+  Wrestler.schema.index({ 'contract.company': 1 });
+  console.log('Added index to Wrestler.contract.company');
+}
+
+// @route   GET /api/wrestlers
+// @desc    Get all wrestlers with optional pagination
+// @access  Public
+router.get('/', async (req, res) => {
+  try {
+    console.log('GET /api/wrestlers - Fetching wrestlers');
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+    
+    // Optional filtering
+    const filter = {};
+    if (req.query.style) filter.style = req.query.style;
+    if (req.query.gender) filter.gender = req.query.gender;
+    if (req.query.freeAgent === 'true') filter['contract.company'] = { $exists: false };
+    
+    // Set a timeout for this query
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Query timed out')), 5000)
+    );
+    
+    // Create the query but limit the fields we're retrieving
+    const wrestlersPromise = Wrestler.find(filter, {
+      name: 1,
+      gender: 1,
+      style: 1,
+      image: 1,
+      attributes: 1,
+      popularity: 1,
+      salary: 1,
+      contract: 1,
+      hometown: 1,
+      age: 1,
+      experience: 1,
+      bio: 1,
+      signatureMoves: 1,
+      finisher: 1,
+      isActive: 1,
+      isInjured: 1
+    })
+    .populate('contract.company', 'name logo')
+    .skip(skip)
+    .limit(limit)
+    .lean() // Use lean() for better performance
+    .exec();
+    
+    // Race the timeout against the query
+    const wrestlers = await Promise.race([wrestlersPromise, timeoutPromise]);
+    
+    console.log(`Found ${wrestlers?.length || 0} wrestlers`);
+    res.json(wrestlers || []);
+  } catch (err) {
+    console.error('Error fetching wrestlers:', err);
+    // Send an empty array instead of an error to prevent blocking clients
+    res.json([]);
+  }
+});
+
+// @route   GET /api/wrestlers/:id
+// @desc    Get wrestler by ID
+// @access  Public
+router.get('/:id', async (req, res) => {
+  try {
+    console.log(`GET /api/wrestlers/${req.params.id}`);
+    const wrestler = await Wrestler.findById(req.params.id)
+      .populate('contract.company', 'name logo owner');
+    
+    if (!wrestler) {
+      return res.status(404).json({ message: 'Wrestler not found' });
+    }
+    
+    res.json(wrestler);
+  } catch (err) {
+    console.error('Error fetching wrestler:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /api/wrestlers/company/:companyId
+// @desc    Get wrestlers by company
+// @access  Public
+router.get('/company/:companyId', async (req, res) => {
+  try {
+    console.log(`GET /api/wrestlers/company/${req.params.companyId}`);
+    
+    // Set a timeout for this query
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Query timed out')), 5000)
+    );
+    
+    // Create the query with limited fields
+    const wrestlersPromise = Wrestler.find({ 
+      'contract.company': req.params.companyId 
+    }, {
+      name: 1, 
+      gender: 1,
+      style: 1,
+      image: 1,
+      attributes: 1,
+      popularity: 1,
+      salary: 1,
+      contract: 1,
+      hometown: 1,
+      age: 1,
+      experience: 1,
+      bio: 1,
+      signatureMoves: 1,
+      finisher: 1,
+      isActive: 1,
+      isInjured: 1
+    })
+    .lean()
+    .exec();
+    
+    // Race the timeout against the query
+    const wrestlers = await Promise.race([wrestlersPromise, timeoutPromise]);
+    
+    console.log(`Found ${wrestlers?.length || 0} wrestlers for company ${req.params.companyId}`);
+    res.json(wrestlers || []);
+  } catch (err) {
+    console.error(`Error fetching company wrestlers:`, err);
+    // Send an empty array instead of an error
+    res.json([]);
+  }
+});
 
 // @route   POST /api/wrestlers
 // @desc    Create a new wrestler
@@ -93,27 +226,6 @@ router.post('/', isAdmin, upload.single('image'), async (req, res) => {
   }
 });
 
-// @route   GET /api/wrestlers
-// @desc    Get all wrestlers
-// @access  Public
-router.get('/', async (req, res) => {
-  // Same as before - everyone can see wrestlers
-});
-
-// @route   GET /api/wrestlers/:id
-// @desc    Get wrestler by ID
-// @access  Public
-router.get('/:id', async (req, res) => {
-  // Same as before - everyone can see wrestler details
-});
-
-// @route   GET /api/wrestlers/company/:companyId
-// @desc    Get wrestlers by company
-// @access  Public
-router.get('/company/:companyId', async (req, res) => {
-  // Same as before - everyone can see company rosters
-});
-
 // @route   PUT /api/wrestlers/:id
 // @desc    Update wrestler
 // @access  Admin or owner
@@ -126,10 +238,6 @@ router.put('/:id', isAuthenticated, canManageWrestler, upload.single('image'), a
       return res.status(404).json({ message: 'Wrestler not found' });
     }
     
-    // Update wrestler (same code as before)
-    // ...
-
-    // Add the logic for updating the wrestler
     const {
       name,
       gender,
@@ -190,7 +298,6 @@ router.put('/:id', isAuthenticated, canManageWrestler, upload.single('image'), a
 
     // Handle image upload
     if (req.file) {
-      // Add code to handle image update (same as before)
       wrestler.image = `/api/uploads/${req.file.filename}`;
     }
     
@@ -206,7 +313,19 @@ router.put('/:id', isAuthenticated, canManageWrestler, upload.single('image'), a
 // @desc    Delete wrestler
 // @access  Admin only
 router.delete('/:id', isAdmin, async (req, res) => {
-  // Same code as before
+  try {
+    const wrestler = await Wrestler.findById(req.params.id);
+    
+    if (!wrestler) {
+      return res.status(404).json({ message: 'Wrestler not found' });
+    }
+    
+    await wrestler.deleteOne();
+    res.json({ message: 'Wrestler deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting wrestler:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // @route   POST /api/wrestlers/:id/sign/:companyId
@@ -255,7 +374,12 @@ router.post('/:id/sign/:companyId', isAuthenticated, async (req, res) => {
     });
     
     // Send Discord webhook notification
-    await discordWebhook.notifyWrestlerSigned(wrestler, company, req.user);
+    try {
+      await discordWebhook.notifyWrestlerSigned(wrestler, company, req.user);
+    } catch (webhookErr) {
+      console.error('Error sending webhook notification:', webhookErr);
+      // Don't block the main operation if webhook fails
+    }
     
     res.json(wrestler);
   } catch (err) {
