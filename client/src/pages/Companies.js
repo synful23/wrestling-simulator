@@ -1,6 +1,7 @@
 // src/pages/Companies.js
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api'; // Import your configured axios
+import { Link } from 'react-router-dom';
 
 const Companies = () => {
   const [companies, setCompanies] = useState([]);
@@ -173,8 +174,11 @@ const Companies = () => {
                 />
                 <span className="text-muted small">{company.owner?.username}</span>
               </div>
-              <div className="text-muted small">
-                {new Date(company.createdAt).toLocaleDateString()}
+              <div>
+                {/* Add Company Details button here */}
+                <Link to={`/company/${company._id}`} className="btn btn-sm btn-outline-primary">
+                  Company Details
+                </Link>
               </div>
             </div>
           </div>
