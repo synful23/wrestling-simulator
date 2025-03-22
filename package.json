@@ -1,0 +1,28 @@
+{
+    "name": "wrestling-simulator",
+    "version": "1.0.0",
+    "description": "Wrestling Booking Simulator",
+    "engines": {
+      "node": ">=16.0.0"
+    },
+    "scripts": {
+      "start": "node server/server.js",
+      "build": "cd client && npm install && npm run build",
+      "install-client": "cd client && npm install",
+      "install-server": "npm install --prefix server",
+      "heroku-postbuild": "npm run install-client && npm run build"
+    },
+    "dependencies": {
+      "axios": "^1.8.4",
+      "connect-mongo": "^5.1.0",
+      "cors": "^2.8.5",
+      "dotenv": "^16.4.7",
+      "express": "^4.21.2",
+      "express-session": "^1.18.1",
+      "mongoose": "^8.12.1",
+      "multer": "^1.4.5-lts.2",
+      "passport": "^0.7.0",
+      "passport-discord": "^0.1.4",
+      "uuid": "^11.1.0"
+    }
+  }
