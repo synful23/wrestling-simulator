@@ -4,6 +4,28 @@ import { Link } from 'react-router-dom';
 import api from '../utils/api';
 import { FaSearch, FaMapMarkerAlt, FaSortAmountDown, FaSortAmountUp, FaFilter, FaBuilding } from 'react-icons/fa';
 
+const getCorrectImageUrl = (logoPath) => {
+  if (!logoPath) return null;
+  
+  // If it's already a full URL, return it
+  if (logoPath.startsWith('http')) return logoPath;
+  
+  const baseUrl = process.env.REACT_APP_API_URL || '';
+  
+  // Critical fix: Convert /uploads/ to /api/uploads/
+  let correctedPath = logoPath;
+  if (logoPath.startsWith('/uploads/')) {
+    correctedPath = `/api${logoPath}`;
+  } else if (logoPath.startsWith('uploads/')) {
+    correctedPath = `/api/${logoPath}`;
+  }
+  
+  // Remove any double slashes (except in http://)
+  const fullUrl = `${baseUrl}${correctedPath}`.replace(/([^:])\/\//g, '$1/');
+  
+  return fullUrl;
+};
+
 const Companies = () => {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -194,11 +216,11 @@ const Companies = () => {
                 <div className="card-img-top bg-light d-flex align-items-center justify-content-center" style={{height: '180px'}}>
                   {company.logo ? (
                     <img
-                      src={`${process.env.REACT_APP_API_URL}${company.logo}`}
-                      alt={`${company.name} logo`}
-                      className="img-fluid" 
-                      style={{maxHeight: '160px', maxWidth: '90%', objectFit: 'contain'}}
-                    />
+                    src={`${getCorrectImageUrl(company.logo)}?t=${new Date().getTime()}`}
+                    alt={`${company.name} logo`}
+                    className="img-fluid" 
+                    style={{maxHeight: '160px', maxWidth: '90%', objectFit: 'contain'}}
+                  />
                   ) : (
                     <FaBuilding style={{ fontSize: '4rem', color: 'var(--gray-400)' }} />
                   )}
