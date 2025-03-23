@@ -4,6 +4,140 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axios from 'axios';
 
+// Component for logo update form
+const CompanyLogoUpdateForm = ({ companyId, currentLogo, onSuccess }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState(
+    currentLogo ? `${process.env.REACT_APP_API_URL}${currentLogo}` : null
+  );
+
+  const handleLogoSubmit = async (e) => {
+    e.preventDefault();
+    const fileInput = document.getElementById('company-logo-file');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+      setError('Please select a file first');
+      return;
+    }
+    
+    // Validate file
+    if (file.size > 2 * 1024 * 1024) {
+      setError('File must be smaller than 2MB');
+      return;
+    }
+    
+    if (!['image/jpeg', 'image/png', 'image/gif'].includes(file.type)) {
+      setError('File must be JPG, PNG, or GIF');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      const formData = new FormData();
+      formData.append('logo', file);
+      
+      // Only include the logo field to minimize potential issues
+      const response = await axios.put(
+        `${process.env.REACT_APP_API_URL}/api/companies/${companyId}`, 
+        formData, 
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          withCredentials: true
+        }
+      );
+      
+      if (response.data && response.data.logo) {
+        // Force cache busting with timestamp
+        const timestamp = new Date().getTime();
+        setPreviewUrl(`${process.env.REACT_APP_API_URL}${response.data.logo}?t=${timestamp}`);
+        
+        if (onSuccess) {
+          onSuccess(response.data);
+        }
+      } else {
+        setError('Logo was not updated. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error updating logo:', err);
+      setError('Failed to update logo: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+  
+  return (
+    <div className="card mb-4">
+      <div className="card-header">
+        <h5 className="mb-0">Update Company Logo</h5>
+      </div>
+      <div className="card-body">
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            {error}
+          </div>
+        )}
+        
+        {previewUrl && (
+          <div className="text-center mb-3">
+            <img 
+              src={previewUrl} 
+              alt="Logo preview" 
+              className="img-thumbnail" 
+              style={{ maxHeight: '150px' }} 
+            />
+          </div>
+        )}
+        
+        <form onSubmit={handleLogoSubmit}>
+          <div className="mb-3">
+            <label htmlFor="company-logo-file" className="form-label">
+              Select new logo
+            </label>
+            <input
+              type="file"
+              className="form-control"
+              id="company-logo-file"
+              accept="image/jpeg,image/png,image/gif"
+              onChange={handleFileChange}
+            />
+            <div className="form-text">
+              Max size: 2MB. Formats: JPG, PNG, GIF
+            </div>
+          </div>
+          
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Uploading...
+              </>
+            ) : (
+              'Update Logo'
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const CompanyDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -22,8 +156,12 @@ const CompanyDetails = () => {
     description: ''
   });
 
+  console.log('CompanyDetails component rendered');
+
   // Fetch company data and related info
   useEffect(() => {
+    console.log('CompanyDetails useEffect called');
+
     const fetchCompanyData = async () => {
       try {
         setLoading(true);
@@ -78,11 +216,31 @@ const CompanyDetails = () => {
     setError('');
 
     try {
-      const res = await axios.put(`${process.env.REACT_APP_API_URL}/api/companies/${id}`, formData, {
-        withCredentials: true
+      // Create form data with only the text fields
+      const formDataToSend = new FormData();
+      formDataToSend.append('name', formData.name);
+      formDataToSend.append('location', formData.location);
+      formDataToSend.append('description', formData.description);
+
+      const res = await axios.put(
+        `${process.env.REACT_APP_API_URL}/api/companies/${id}`, 
+        formDataToSend,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          withCredentials: true
+        }
+      );
+      
+      // Update company state with response data
+      setCompany({
+        ...company,
+        name: res.data.name,
+        location: res.data.location,
+        description: res.data.description
       });
       
-      setCompany(res.data);
       alert('Company updated successfully');
     } catch (err) {
       console.error('Error updating company:', err);
@@ -135,6 +293,14 @@ const CompanyDetails = () => {
     setShowModal(true);
   };
 
+  // Handle logo update success
+  const handleLogoUpdateSuccess = (updatedCompany) => {
+    setCompany({
+      ...company,
+      logo: updatedCompany.logo
+    });
+  };
+
   if (loading) {
     return (
       <div className="container mt-5 text-center">
@@ -184,7 +350,7 @@ const CompanyDetails = () => {
             <div className="card-body text-center">
               {company.logo ? (
                 <img
-                  src={`${process.env.REACT_APP_API_URL}${company.logo}`}
+                  src={`${process.env.REACT_APP_API_URL}${company.logo}?t=${new Date().getTime()}`}
                   alt={`${company.name} logo`}
                   className="img-fluid mb-3"
                   style={{ maxHeight: '150px' }}
@@ -295,75 +461,71 @@ const CompanyDetails = () => {
         {/* Right Column - Edit Form and Stats */}
         <div className="col-md-8">
           {isOwner ? (
-            <div className="card mb-4">
-              <div className="card-header bg-info text-white">
-                <h3 className="mb-0">Edit Company Details</h3>
+            <>
+              {/* Separate Logo Form */}
+              <CompanyLogoUpdateForm 
+                companyId={company._id}
+                currentLogo={company.logo}
+                onSuccess={handleLogoUpdateSuccess}
+              />
+              
+              {/* Company Details Form */}
+              <div className="card mb-4">
+                <div className="card-header bg-info text-white">
+                  <h3 className="mb-0">Edit Company Details</h3>
+                </div>
+                <div className="card-body">
+                  <form onSubmit={handleSubmit}>
+                    <div className="mb-3">
+                      <label htmlFor="name" className="form-label">Company Name</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="mb-3">
+                      <label htmlFor="location" className="form-label">Location</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="location"
+                        name="location"
+                        value={formData.location}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="mb-3">
+                      <label htmlFor="description" className="form-label">Description</label>
+                      <textarea
+                        className="form-control"
+                        id="description"
+                        name="description"
+                        rows="4"
+                        value={formData.description}
+                        onChange={handleChange}
+                        required
+                      ></textarea>
+                    </div>
+                    
+                    <button 
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={loading}
+                    >
+                      {loading ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </form>
+                </div>
               </div>
-              <div className="card-body">
-                <form onSubmit={handleSubmit}>
-                  <div className="mb-3">
-                    <label htmlFor="name" className="form-label">Company Name</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="mb-3">
-                    <label htmlFor="location" className="form-label">Location</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      id="location"
-                      name="location"
-                      value={formData.location}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="mb-3">
-                    <label htmlFor="description" className="form-label">Description</label>
-                    <textarea
-                      className="form-control"
-                      id="description"
-                      name="description"
-                      rows="4"
-                      value={formData.description}
-                      onChange={handleChange}
-                      required
-                    ></textarea>
-                  </div>
-                  
-                  <div className="mb-3">
-                    <label htmlFor="logo" className="form-label">Company Logo</label>
-                    <input
-                      type="file"
-                      className="form-control"
-                      id="logo"
-                      name="logo"
-                      accept="image/jpeg, image/png, image/gif"
-                    />
-                    <small className="form-text text-muted">
-                      Optional: Upload a new logo (JPG, PNG, GIF, max 2MB)
-                    </small>
-                  </div>
-                  
-                  <button 
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={loading}
-                  >
-                    {loading ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </form>
-              </div>
-            </div>
+            </>
           ) : (
             <div className="alert alert-info">
               You are viewing this company as a guest. Only the owner can manage this company.
