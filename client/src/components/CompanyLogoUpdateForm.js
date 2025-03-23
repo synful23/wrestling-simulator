@@ -1,15 +1,41 @@
-// This is a simplified, self-contained form component specifically for updating the company logo
-// You can add this as a new component in your project
-
-import React, { useState } from 'react';
+// Fixed CompanyLogoUpdateForm.js with path correction
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const CompanyLogoUpdateForm = ({ companyId, currentLogo, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [previewUrl, setPreviewUrl] = useState(
-    currentLogo ? `${process.env.REACT_APP_API_URL}${currentLogo}` : null
-  );
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  // Corrected function to convert DB path to URL
+  const getImageUrl = (logoPath) => {
+    if (!logoPath) return null;
+    
+    // If it's already a full URL, return it
+    if (logoPath.startsWith('http')) return logoPath;
+    
+    const baseUrl = process.env.REACT_APP_API_URL || '';
+    
+    // Critical fix: Convert /uploads/ to /api/uploads/
+    let correctedPath = logoPath;
+    if (logoPath.startsWith('/uploads/')) {
+      correctedPath = `/api${logoPath}`;
+    } else if (logoPath.startsWith('uploads/')) {
+      correctedPath = `/api/${logoPath}`;
+    }
+    
+    // Remove any double slashes (except in http://)
+    const fullUrl = `${baseUrl}${correctedPath}`.replace(/([^:])\/\//g, '$1/');
+    
+    return fullUrl;
+  };
+
+  // Initialize preview with current logo
+  useEffect(() => {
+    if (currentLogo) {
+      setPreviewUrl(getImageUrl(currentLogo));
+    }
+  }, [currentLogo]);
 
   const handleLogoSubmit = async (e) => {
     e.preventDefault();
@@ -39,6 +65,8 @@ const CompanyLogoUpdateForm = ({ companyId, currentLogo, onSuccess }) => {
       const formData = new FormData();
       formData.append('logo', file);
       
+      console.log(`Uploading logo for company ID: ${companyId}`);
+      
       // Only include the logo field to minimize potential issues
       const response = await axios.put(
         `${process.env.REACT_APP_API_URL}/api/companies/${companyId}`, 
@@ -51,10 +79,17 @@ const CompanyLogoUpdateForm = ({ companyId, currentLogo, onSuccess }) => {
         }
       );
       
+      console.log('Logo update response:', response.data);
+      
       if (response.data && response.data.logo) {
         // Force cache busting with timestamp
         const timestamp = new Date().getTime();
-        setPreviewUrl(`${process.env.REACT_APP_API_URL}${response.data.logo}?t=${timestamp}`);
+        
+        // Apply the path correction and append timestamp
+        const correctedUrl = `${getImageUrl(response.data.logo)}?t=${timestamp}`;
+        console.log('Setting new corrected logo URL:', correctedUrl);
+        
+        setPreviewUrl(correctedUrl);
         
         if (onSuccess) {
           onSuccess(response.data);
@@ -73,7 +108,9 @@ const CompanyLogoUpdateForm = ({ companyId, currentLogo, onSuccess }) => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setPreviewUrl(URL.createObjectURL(file));
+      // Create a local preview URL for the selected file
+      const localPreviewUrl = URL.createObjectURL(file);
+      setPreviewUrl(localPreviewUrl);
     }
   };
   
@@ -96,6 +133,11 @@ const CompanyLogoUpdateForm = ({ companyId, currentLogo, onSuccess }) => {
               alt="Logo preview" 
               className="img-thumbnail" 
               style={{ maxHeight: '150px' }} 
+              onError={(e) => {
+                console.error('Image failed to load:', previewUrl);
+                e.target.src = 'https://via.placeholder.com/150x150?text=Logo+Error';
+                e.target.onerror = null; // Prevent infinite error loop
+              }}
             />
           </div>
         )}

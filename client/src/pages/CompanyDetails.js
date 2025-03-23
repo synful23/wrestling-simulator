@@ -4,6 +4,33 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axios from 'axios';
 
+/**
+ * Corrects image paths for the API
+ * @param {string} logoPath - The logo path from the database
+ * @returns {string} The corrected URL
+ */
+const getCorrectImageUrl = (logoPath) => {
+  if (!logoPath) return null;
+  
+  // If it's already a full URL, return it
+  if (logoPath.startsWith('http')) return logoPath;
+  
+  const baseUrl = process.env.REACT_APP_API_URL || '';
+  
+  // Critical fix: Convert /uploads/ to /api/uploads/
+  let correctedPath = logoPath;
+  if (logoPath.startsWith('/uploads/')) {
+    correctedPath = `/api${logoPath}`;
+  } else if (logoPath.startsWith('uploads/')) {
+    correctedPath = `/api/${logoPath}`;
+  }
+  
+  // Remove any double slashes (except in http://)
+  const fullUrl = `${baseUrl}${correctedPath}`.replace(/([^:])\/\//g, '$1/');
+  
+  return fullUrl;
+};
+
 // Component for logo update form
 const CompanyLogoUpdateForm = ({ companyId, currentLogo, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -348,18 +375,23 @@ const CompanyDetails = () => {
               <h3 className="card-title mb-0">{company.name}</h3>
             </div>
             <div className="card-body text-center">
-              {company.logo ? (
-                <img
-                  src={`${process.env.REACT_APP_API_URL}${company.logo}?t=${new Date().getTime()}`}
-                  alt={`${company.name} logo`}
-                  className="img-fluid mb-3"
-                  style={{ maxHeight: '150px' }}
-                />
-              ) : (
-                <div className="bg-light d-flex align-items-center justify-content-center mb-3" style={{height: '150px'}}>
-                  <span className="text-muted">No Logo</span>
-                </div>
-              )}
+            {company.logo ? (
+  <img
+    src={`${getCorrectImageUrl(company.logo)}?t=${new Date().getTime()}`}
+    alt={`${company.name} logo`}
+    className="img-fluid mb-3"
+    style={{ maxHeight: '150px' }}
+    onError={(e) => {
+      console.error('Logo failed to load:', company.logo);
+      e.target.src = 'https://via.placeholder.com/150x150?text=No+Logo';
+      e.target.onerror = null;
+    }}
+  />
+) : (
+  <div className="bg-light d-flex align-items-center justify-content-center mb-3" style={{height: '150px'}}>
+    <span className="text-muted">No Logo</span>
+  </div>
+)}
               
               <h5><strong>Location:</strong> {company.location}</h5>
               
