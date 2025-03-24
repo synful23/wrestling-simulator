@@ -44,6 +44,9 @@ const Navbar = () => {
 <li className="nav-item">
   <Link className="nav-link" to="/venues">Venues</Link>
 </li>
+<li className="nav-item">
+  <Link className="nav-link" to="/championships">Championships</Link>
+</li>
             {user ? (
               <>
                 <li className="nav-item">

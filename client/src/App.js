@@ -20,6 +20,9 @@ import ShowForm from './pages/ShowForm';
 import ShowBooking from './pages/ShowBooking';
 import DebugPanel from './components/DebugPanel';
 import CompanyDetails from './pages/CompanyDetails';
+import ChampionshipsPage from './pages/ChampionshipsPage';
+import ChampionshipForm from './pages/ChampionshipForm';
+import ChampionshipDetail from './pages/ChampionshipDetail';
 
 
 
@@ -80,6 +83,19 @@ function App() {
             <Route path="/shows/:id/book" element={
               <PrivateRoute>
                 <ShowBooking />
+              </PrivateRoute>
+            } />
+            <Route path="/championships" element={<ChampionshipsPage />} />
+            <Route path="/championships/company/:companyId" element={<ChampionshipsPage />} />
+            <Route path="/championships/new" element={
+              <PrivateRoute>
+                <ChampionshipForm />
+              </PrivateRoute>
+            } />
+            <Route path="/championships/:id" element={<ChampionshipDetail />} />
+            <Route path="/championships/:id/edit" element={
+              <PrivateRoute>
+                <ChampionshipForm />
               </PrivateRoute>
             } />
             {/* Add the new company details route */}

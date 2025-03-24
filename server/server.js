@@ -18,6 +18,7 @@ const authRoutes = require('./routes/auth');
 const companyRoutes = require('./routes/companies');
 const wrestlerRoutes = require('./routes/wrestlers');
 const venueRoutes = require('./routes/venues');
+const championshipRoutes = require('./routes/championships');
 const showRoutes = require('./routes/shows');
 
 
@@ -182,6 +183,8 @@ app.use('/api/companies', companyRoutes);
 app.use('/api/wrestlers', wrestlerRoutes);
 app.use('/api/venues', venueRoutes);
 app.use('/api/shows', showRoutes);
+app.use('/api/championships', championshipRoutes);
+
 
 
 // Add a test route to verify server is running
