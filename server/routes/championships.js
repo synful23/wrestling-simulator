@@ -9,29 +9,31 @@ const { isAuthenticated } = require('../middleware/auth');
 
 // Check if user is the company owner
 const isCompanyOwner = async (req, res, next) => {
-  try {
-    const companyId = req.body.company || req.params.companyId;
-    
-    if (!companyId) {
-      return res.status(400).json({ message: 'Company ID is required' });
+    try {
+      console.log('Request body:', req.body);
+      const companyId = req.body.company;
+      
+      if (!companyId) {
+        return res.status(400).json({ message: 'Company ID is required' });
+      }
+      
+      const company = await Company.findById(companyId);
+      
+      if (!company) {
+        return res.status(404).json({ message: 'Company not found' });
+      }
+      
+      // Ensure the current user is the owner
+      if (company.owner.toString() !== req.user.id) {
+        return res.status(403).json({ message: 'Not authorized to create championships for this company' });
+      }
+      
+      next();
+    } catch (err) {
+      console.error('Error checking company ownership:', err);
+      res.status(500).json({ message: 'Server error' });
     }
-    
-    const company = await Company.findById(companyId);
-    
-    if (!company) {
-      return res.status(404).json({ message: 'Company not found' });
-    }
-    
-    if (company.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to manage championships for this company' });
-    }
-    
-    next();
-  } catch (err) {
-    console.error('Error checking company ownership:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
+  };
 
 // @route   POST /api/championships
 // @desc    Create a new championship
@@ -130,14 +132,46 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.put('/:id/image', isAuthenticated, upload.single('image'), async (req, res) => {
+    try {
+      const championship = await Championship.findById(req.params.id)
+        .populate('company', 'owner');
+      
+      if (!championship) {
+        return res.status(404).json({ message: 'Championship not found' });
+      }
+      
+      // Check if user is authorized
+      if (championship.company.owner.toString() !== req.user.id) {
+        return res.status(403).json({ message: 'Not authorized to update this championship' });
+      }
+      
+      // Add image if uploaded
+      if (req.file) {
+        championship.image = `/api/uploads/${req.file.filename}`;
+        await championship.save();
+      }
+      
+      res.json(championship);
+    } catch (err) {
+      console.error('Error updating championship image:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
 // @route   GET /api/championships/company/:companyId
 // @desc    Get championships for a specific company
 // @access  Public
 router.get('/company/:companyId', async (req, res) => {
     try {
-      console.log('Fetching championships for company ID:', req.params.companyId);
-      const championships = await Championship.find({ company: req.params.companyId });
-      console.log('Found championships:', championships);
+      const championships = await Championship.find({ company: req.params.companyId })
+        .populate('company', 'name logo')
+        .populate({
+          path: 'currentHolder',
+          select: 'name image contract' // Explicitly select these fields
+        })
+        .sort({ prestige: -1 });
+      
       res.json(championships);
     } catch (err) {
       console.error('Error fetching company championships:', err);
@@ -253,31 +287,36 @@ router.delete('/:id', isAuthenticated, async (req, res) => {
 // @desc    Set championship holder
 // @access  Private - Company Owner
 router.post('/:id/holder', isAuthenticated, async (req, res) => {
-  try {
-    const championship = await Championship.findById(req.params.id)
-      .populate('company', 'owner');
-    
-    if (!championship) {
-      return res.status(404).json({ message: 'Championship not found' });
-    }
-    
-    // Check if user is authorized
-    if (championship.company.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to update this championship' });
-    }
-    
-    const { wrestlerId, wonFromId, showId } = req.body;
-    
-    // Validate wrestler
-    const wrestler = await Wrestler.findById(wrestlerId);
-    if (!wrestler) {
-      return res.status(404).json({ message: 'Wrestler not found' });
-    }
-    
-    // Check if wrestler belongs to the same company
-    if (!wrestler.contract || wrestler.contract.company.toString() !== championship.company.toString()) {
-      return res.status(400).json({ message: 'Wrestler must be under contract with the same company' });
-    }
+    try {
+      const championship = await Championship.findById(req.params.id)
+        .populate('company', 'owner');
+      
+      if (!championship) {
+        return res.status(404).json({ message: 'Championship not found' });
+      }
+      
+      const { wrestlerId, wonFromId, showId } = req.body;
+      
+      // Validate wrestler
+      const wrestler = await Wrestler.findById(wrestlerId);
+      if (!wrestler) {
+        return res.status(404).json({ message: 'Wrestler not found' });
+      }
+      
+      // Debug logging
+      console.log('Championship Company:', championship.company);
+      console.log('Wrestler Contract:', wrestler.contract);
+      console.log('Wrestler ID:', wrestlerId);
+      console.log('Championship Company ID:', championship.company._id);
+      
+      // Check if wrestler belongs to the same company
+      if (!wrestler.contract || wrestler.contract.company.toString() !== championship.company._id.toString()) {
+        return res.status(400).json({ 
+          message: 'Wrestler must be under contract with the same company',
+          wrestlerCompany: wrestler.contract?.company,
+          championshipCompany: championship.company._id
+        });
+      }
     
     // Set the new champion
     await championship.setChampion(wrestlerId, wonFromId, showId);

@@ -23,7 +23,7 @@ import CompanyDetails from './pages/CompanyDetails';
 import ChampionshipsPage from './pages/ChampionshipsPage';
 import ChampionshipForm from './pages/ChampionshipForm';
 import ChampionshipDetail from './pages/ChampionshipDetail';
-
+import FreeAgentForm from './pages/FreeAgentForm';
 
 
 function App() {
@@ -50,6 +50,11 @@ function App() {
             <Route path="/wrestlers/new" element={
               <PrivateRoute>
                 <WrestlerForm />
+              </PrivateRoute>
+            } />
+            <Route path="/admin/wrestlers/new" element={
+              <PrivateRoute>
+                <FreeAgentForm />
               </PrivateRoute>
             } />
             <Route path="/wrestlers/edit/:id" element={

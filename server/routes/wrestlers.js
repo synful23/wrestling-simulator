@@ -295,6 +295,7 @@ router.put('/:id', isAuthenticated, canManageWrestler, upload.single('image'), a
         exclusive: exclusive === 'true' || exclusive === true
       };
     }
+    
 
     // Handle image upload
     if (req.file) {

@@ -111,32 +111,42 @@ const ChampionshipForm = () => {
     setError('');
     
     try {
-      const formDataToSend = new FormData();
-      
-      // Add all fields to FormData
-      Object.keys(formData).forEach(key => {
-        if (key !== 'image' || (key === 'image' && formData[key])) {
-          formDataToSend.append(key, formData[key]);
-        }
-      });
-      
+      // Use a plain object instead of FormData
+      const payload = {
+        company: formData.company,
+        name: formData.name,
+        description: formData.description,
+        weight: formData.weight,
+        prestige: formData.prestige,
+        isActive: formData.isActive
+      };
+  
       let response;
       
       if (id) {
         // Update existing championship
         response = await axios.put(
           `${process.env.REACT_APP_API_URL}/api/championships/${id}`, 
-          formDataToSend,
-          {
-            headers: { 'Content-Type': 'multipart/form-data' },
-            withCredentials: true
-          }
+          payload,
+          { withCredentials: true }
         );
       } else {
         // Create new championship
         response = await axios.post(
           `${process.env.REACT_APP_API_URL}/api/championships`, 
-          formDataToSend,
+          payload,
+          { withCredentials: true }
+        );
+      }
+      
+      // If image exists, send it separately
+      if (formData.image) {
+        const imageFormData = new FormData();
+        imageFormData.append('image', formData.image);
+        
+        await axios.put(
+          `${process.env.REACT_APP_API_URL}/api/championships/${response.data._id}/image`, 
+          imageFormData,
           {
             headers: { 'Content-Type': 'multipart/form-data' },
             withCredentials: true
@@ -147,7 +157,7 @@ const ChampionshipForm = () => {
       // Redirect to championship details page
       navigate(`/championships/${response.data._id}`);
     } catch (err) {
-      console.error('Error saving championship:', err);
+      console.error('Full error details:', err.response);
       setError(err.response?.data?.message || 'Error saving championship data');
     } finally {
       setLoading(false);

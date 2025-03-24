@@ -187,41 +187,45 @@ const CompanyDetails = () => {
 
   // Fetch company data and related info
   useEffect(() => {
-    console.log('CompanyDetails useEffect called');
-
     const fetchCompanyData = async () => {
       try {
         setLoading(true);
-
+  
         // Fetch company details
         const companyRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/companies/${id}`, {
           withCredentials: true
         });
+        console.log('Company data:', companyRes.data);
         setCompany(companyRes.data);
+        
+        // Ensure safe fallback for form data
         setFormData({
-          name: companyRes.data.name,
-          location: companyRes.data.location,
-          description: companyRes.data.description
+          name: companyRes.data?.name || '',
+          location: companyRes.data?.location || '',
+          description: companyRes.data?.description || ''
         });
-
+  
         // Fetch wrestlers for this company
         const wrestlersRes = await axios.get(
           `${process.env.REACT_APP_API_URL}/api/wrestlers/company/${id}`
         );
-        setWrestlers(wrestlersRes.data);
-
-        // Fetch Championships
-        const championshipsRes = await axios.get(
-          `${process.env.REACT_APP_API_URL}/api/championships/company/${id}`
-        );
-        setChampionships(championshipsRes.data);
-
+        console.log('Wrestlers data:', wrestlersRes.data);
+        setWrestlers(wrestlersRes.data || []);
+  
         // Fetch shows for this company
         const showsRes = await axios.get(
           `${process.env.REACT_APP_API_URL}/api/shows/company/${id}`
         );
-        setShows(showsRes.data);
-
+        console.log('Shows data:', showsRes.data);
+        setShows(showsRes.data || []);
+  
+        // Fetch championships for this company
+        const championshipsRes = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/championships/company/${id}`
+        );
+        console.log('Championships data:', championshipsRes.data);
+        setChampionships(championshipsRes.data || []);
+  
       } catch (err) {
         console.error('Error fetching company data:', err);
         setError('Failed to load company data. Please try again.');
@@ -229,10 +233,10 @@ const CompanyDetails = () => {
         setLoading(false);
       }
     };
-
+  
     fetchCompanyData();
   }, [id]);
-
+  
   // Handle form input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -647,72 +651,74 @@ const CompanyDetails = () => {
     <h3 className="mb-0">Championships</h3>
   </div>
   <div className="card-body">
-    {championships.length === 0 ? (
-      <div className="text-center py-3">
-        <p>No championships found for this company.</p>
-        {isOwner && (
-          <Link 
-            to={`/championships/new?company=${company._id}`} 
-            className="btn btn-primary"
-          >
-            Create First Championship
-          </Link>
-        )}
-      </div>
-    ) : (
-      <div className="row">
-        {championships
-          .sort((a, b) => b.prestige - a.prestige)
-          .slice(0, 4)
-          .map(championship => (
-            <div key={championship._id} className="col-md-6 mb-3">
-              <div className="card h-100">
-                <div className="card-body">
-                  <h5 className="card-title">{championship.name}</h5>
-                  <div className="mb-2">
-                    <span className="badge bg-secondary">{championship.weight}</span>
-                    <span className="badge bg-info ms-2">{championship.prestige}/100</span>
-                  </div>
-                  
-                  {championship.currentHolder ? (
-                    <div className="d-flex align-items-center mt-2">
-                      {championship.currentHolder.image ? (
-                        <img
-                          src={`${process.env.REACT_APP_API_URL}${championship.currentHolder.image}`}
-                          alt={championship.currentHolder.name}
-                          className="me-2 rounded-circle"
-                          style={{ width: '40px', height: '40px', objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <div 
-                          className="me-2 bg-secondary text-white d-flex align-items-center justify-content-center rounded-circle"
-                          style={{ width: '40px', height: '40px' }}
-                        >
-                          {championship.currentHolder.name.charAt(0)}
-                        </div>
-                      )}
-                      <div>
-                        <div>{championship.currentHolder.name}</div>
-                        <small className="text-muted">Current Champion</small>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-muted mt-2">No current champion</div>
-                  )}
-                </div>
-                <div className="card-footer">
-                  <Link 
-                    to={`/championships/${championship._id}`} 
-                    className="btn btn-primary w-100"
-                  >
-                    View Details
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ))}
-      </div>
+  {championships.length === 0 ? (
+  <div className="text-center py-3">
+    <p>No championships found for this company.</p>
+    {isOwner && (
+      <Link 
+        to={`/championships/new?company=${company._id}`} 
+        className="btn btn-primary"
+      >
+        Create First Championship
+      </Link>
     )}
+  </div>
+) : (
+  <div className="row">
+    {championships
+      .sort((a, b) => b.prestige - a.prestige)
+      .slice(0, 4)
+      .map(championship => (
+        <div key={championship._id} className="col-md-6 mb-3">
+          <div className="card h-100">
+            <div className="card-body">
+              <h5 className="card-title">{championship.name || 'Unnamed Championship'}</h5>
+              <div className="mb-2">
+                <span className="badge bg-secondary">{championship.weight || 'Unknown Division'}</span>
+                <span className="badge bg-info ms-2">{championship.prestige || 0}/100</span>
+              </div>
+              
+              {championship.currentHolder ? (
+                <div className="d-flex align-items-center mt-2">
+                  {championship.currentHolder.image ? (
+                    <img
+                      src={`${process.env.REACT_APP_API_URL}${championship.currentHolder.image}`}
+                      alt={championship.currentHolder.name}
+                      className="me-2 rounded-circle"
+                      style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div 
+                      className="me-2 bg-secondary text-white d-flex align-items-center justify-content-center rounded-circle"
+                      style={{ width: '40px', height: '40px' }}
+                    >
+                      {championship.currentHolder.name 
+                        ? championship.currentHolder.name.charAt(0) 
+                        : '?'}
+                    </div>
+                  )}
+                  <div>
+                    <div>{championship.currentHolder.name || 'Unknown Champion'}</div>
+                    <small className="text-muted">Current Champion</small>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-muted mt-2">No current champion</div>
+              )}
+            </div>
+            <div className="card-footer">
+              <Link 
+                to={`/championships/${championship._id}`} 
+                className="btn btn-primary w-100"
+              >
+                View Details
+              </Link>
+            </div>
+          </div>
+        </div>
+      ))}
+  </div>
+)}
     
     <div className="text-center mt-3">
       <Link 

@@ -45,6 +45,28 @@ const [error, setError] = useState('');
       throw error;
     }
   };
+
+  const getCorrectImageUrl = (logoPath) => {
+    if (!logoPath) return null;
+    
+    // If it's already a full URL, return it
+    if (logoPath.startsWith('http')) return logoPath;
+    
+    const baseUrl = process.env.REACT_APP_API_URL || '';
+    
+    // Critical fix: Convert /uploads/ to /api/uploads/
+    let correctedPath = logoPath;
+    if (logoPath.startsWith('/uploads/')) {
+      correctedPath = `/api${logoPath}`;
+    } else if (logoPath.startsWith('uploads/')) {
+      correctedPath = `/api/${logoPath}`;
+    }
+    
+    // Remove any double slashes (except in http://)
+    const fullUrl = `${baseUrl}${correctedPath}`.replace(/([^:])\/\//g, '$1/');
+    
+    return fullUrl;
+  };
   
   useEffect(() => {
     const fetchData = async () => {
@@ -189,16 +211,17 @@ const [error, setError] = useState('');
         <div className="card-body">
           <div className="row">
             <div className="col-md-3 text-center">
-              {company.logo ? (
-                <img 
-                  src={`${process.env.REACT_APP_API_URL}${company.logo}`}
-                  alt={`${company.name} logo`}
-                  className="img-fluid"
-                  style={{ maxHeight: '100px' }}
-                />
-              ) : (
-                <div className="bg-light p-3 rounded">No Logo</div>
-              )}
+            {company.logo ? (
+                       <img
+                       src={`${getCorrectImageUrl(company.logo)}?t=${new Date().getTime()}`}
+                       alt={`${company.name} logo`}
+                       className="img-fluid company-logo"
+                     />
+                      ) : (
+                        <div className="bg-light d-flex align-items-center justify-content-center" style={{height: '100px'}}>
+                          <span className="text-muted">No Logo</span>
+                        </div>
+                      )}
             </div>
             
             <div className="col-md-9">
