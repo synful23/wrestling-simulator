@@ -71,7 +71,8 @@ const ChampionshipsPage = () => {
   
   // Check if the user is the company owner
   const isCompanyOwner = company && user && 
-    (user.id === company.owner._id || user._id === company.owner._id || user.id === company.owner || user._id === company.owner);
+  (user.id === company.owner || user._id === company.owner || 
+   user.id === company.owner._id || user._id === company.owner._id);
   
   // Filter championships
   const filteredChampionships = championships.filter(championship => {
