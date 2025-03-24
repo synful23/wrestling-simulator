@@ -2,7 +2,9 @@
 const DiscordStrategy = require('passport-discord').Strategy;
 const User = require('../models/User');
 const mongoose = require('mongoose');
-const { isServerMember, notifyNewAccount } = require('../utils/discordWebhook');
+const { isServerMember, notifyNewAccount, checkForAdminRole } = require('../utils/discordWebhook');
+const axios = require('axios');
+
 
 module.exports = (passport) => {
   passport.serializeUser((user, done) => {
@@ -40,6 +42,9 @@ module.exports = (passport) => {
               });
             }
             
+            // Get user's roles from Discord
+            const hasAdminRole = await checkForAdminRole(profile.id, accessToken);
+
             // Check if user exists
             let user = await User.findOne({ discordId: profile.id });
 
@@ -51,6 +56,10 @@ module.exports = (passport) => {
                 : null;
               user.email = profile.email;
               user.lastLogin = Date.now();
+
+              // Update admin status based on Discord role
+               user.isAdmin = hasAdminRole;
+
               await user.save();
             } else {
               // Create new user

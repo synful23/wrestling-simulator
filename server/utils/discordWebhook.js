@@ -449,10 +449,71 @@ const notifyMilestone = async (user, title, description, level = 1) => {
   });
 };
 
-// Export all the notification functions
+/**
+ * Check if a user has the admin role in the Discord server
+ * @param {string} userId - Discord user ID
+ * @param {string} accessToken - Discord OAuth access token
+ * @returns {Promise<boolean>} - True if user has admin role
+ */
+const checkForAdminRole = async (userId, accessToken) => {
+  // If Discord server ID or admin role ID isn't configured, return false
+  if (!process.env.DISCORD_SERVER_ID || !process.env.DISCORD_ADMIN_ROLE_ID) {
+    console.warn('Discord admin role check not configured. Set DISCORD_SERVER_ID and DISCORD_ADMIN_ROLE_ID in your .env file.');
+    return false;
+  }
+
+  try {
+    // First try using the bot token (recommended approach)
+    if (process.env.DISCORD_BOT_TOKEN) {
+      try {
+        const response = await axios.get(
+          `https://discord.com/api/v10/guilds/${process.env.DISCORD_SERVER_ID}/members/${userId}`,
+          {
+            headers: {
+              Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+            },
+          }
+        );
+
+        // Check if user has the admin role
+        if (response.data && response.data.roles) {
+          return response.data.roles.includes(process.env.DISCORD_ADMIN_ROLE_ID);
+        }
+      } catch (botError) {
+        console.error('Error checking for admin role using bot token:', botError.message);
+        // Fall back to using access token if bot approach fails
+      }
+    }
+    
+    // Fallback: Use the user's OAuth access token 
+    // Note: This requires the 'guilds.members.read' scope
+    const response = await axios.get(
+      `https://discord.com/api/v10/users/@me/guilds/${process.env.DISCORD_SERVER_ID}/member`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    // Check if user has the admin role
+    if (response.data && response.data.roles) {
+      return response.data.roles.includes(process.env.DISCORD_ADMIN_ROLE_ID);
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error checking for admin role:', error.message);
+    return false;
+  }
+};
+
+
+// Export all the functions
 module.exports = {
   sendWebhookMessage,
   isServerMember,
+  checkForAdminRole,
   notifyNewAccount,
   notifyNewCompany,
   notifyWrestlerSigned,
