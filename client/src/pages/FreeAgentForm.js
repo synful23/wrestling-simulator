@@ -1,4 +1,4 @@
-// src/pages/FreeAgentForm.js
+// src/pages/FreeAgentForm.js - Fixed to make company optional when editing
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
@@ -135,7 +135,13 @@ const FreeAgentForm = () => {
       
       // Add all fields to FormData
       Object.keys(formData).forEach(key => {
-        if (key !== 'image' || (key === 'image' && formData[key])) {
+        // Don't send empty companyId - this makes it a free agent
+        if (key === 'companyId' && !formData[key]) {
+          return;
+        }
+        
+        // Don't send image unless it's a File object
+        if (key !== 'image' || (key === 'image' && formData[key] instanceof File)) {
           formDataToSend.append(key, formData[key]);
         }
       });
@@ -465,7 +471,7 @@ const FreeAgentForm = () => {
                 </div>
                 
                 <div className="mb-3">
-                  <label htmlFor="companyId" className="form-label">Company</label>
+                  <label htmlFor="companyId" className="form-label">Company (Optional)</label>
                   <select
                     className="form-select"
                     id="companyId"

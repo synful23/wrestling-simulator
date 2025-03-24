@@ -29,27 +29,29 @@ api.interceptors.request.use(
   }
 );
 
-// Add a response interceptor to handle errors globally
+// Add a response interceptor to handle common errors
 api.interceptors.response.use(
-  (response) => {
-    console.log(`API Response from: ${response.config.url} - Status: ${response.status}`);
-    return response;
-  },
+  (response) => response,
   (error) => {
-    // Handle session expiration or other global errors
+    // Don't log 401 errors from auth checks - these are expected when not logged in
+    if (
+      error.response && 
+      error.response.status === 401 && 
+      error.config.url === '/api/auth/user'
+    ) {
+      // Silent fail for auth check - this is normal when user isn't logged in
+      return Promise.resolve({ data: null });
+    }
+    
+    // Log other errors
     if (error.response) {
-      console.error(`API Error: ${error.response.status} - ${error.response.data.message || 'Unknown error'}`);
-      
-      if (error.response.status === 401) {
-        console.log('Authentication failed. Redirecting to login...');
-        // Only redirect if not already on login page
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
-        }
-      }
+      // Server responded with non-2xx status
+      console.error(`API Error: ${error.response.status} - ${error.response.statusText}`);
     } else if (error.request) {
+      // Request made but no response received
       console.error('API Error: No response received', error.request);
     } else {
+      // Error in setting up request
       console.error('API Error:', error.message);
     }
     

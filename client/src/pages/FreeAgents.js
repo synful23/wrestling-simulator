@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import api from '../utils/api';
 import axios from 'axios';
-import { FaUserPlus, FaFilter, FaSearch, FaSortAmountDown, FaSortAmountUp } from 'react-icons/fa';
+import { FaUserPlus, FaFilter, FaSearch, FaSortAmountDown, FaSortAmountUp, FaDumbbell, FaStar, FaCog, FaRunning } from 'react-icons/fa';
 
 const TIMEOUT_MS = 10000; // 10 seconds timeout
 
@@ -478,10 +478,10 @@ const FreeAgents = () => {
                       </div>
                       
                       <div className="d-flex small text-muted mt-1">
-                        <div title="Strength" className="me-2"><i className="fas fa-dumbbell"></i> {wrestler.attributes.strength}</div>
-                        <div title="Agility" className="me-2"><i className="fas fa-running"></i> {wrestler.attributes.agility}</div>
-                        <div title="Charisma" className="me-2"><i className="fas fa-star"></i> {wrestler.attributes.charisma}</div>
-                        <div title="Technical" className="me-2"><i className="fas fa-cog"></i> {wrestler.attributes.technical}</div>
+                        <div title="Strength" className="me-2"><FaDumbbell className="me-2" /> {wrestler.attributes.strength}</div>
+                        <div title="Agility" className="me-2"><FaRunning className="me-2" /> {wrestler.attributes.agility}</div>
+                        <div title="Charisma" className="me-2"><FaStar className="me-2" /> {wrestler.attributes.charisma}</div>
+                        <div title="Technical" className="me-2"><FaCog className="me-2" /> {wrestler.attributes.technical}</div>
                       </div>
                       
                       {/* Admin Controls */}

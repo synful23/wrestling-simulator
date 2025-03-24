@@ -1,4 +1,4 @@
-// src/pages/WrestlerForm.js - Updated to add admin validation
+// src/pages/WrestlerForm.js - Fixed to make company optional when editing free agents
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
@@ -182,9 +182,14 @@ const WrestlerForm = () => {
     try {
       const formDataToSend = new FormData();
       
-      // Add all fields to FormData
+      // Add all fields to FormData, except for empty companyId when admin is editing
       Object.keys(formData).forEach(key => {
-        if (key !== 'image' || (key === 'image' && formData[key])) {
+        // Skip empty companyId if admin is editing a wrestler
+        if (key === 'companyId' && !formData[key] && user && user.isAdmin) {
+          return;
+        }
+        
+        if (key !== 'image' || (key === 'image' && formData[key] instanceof File)) {
           formDataToSend.append(key, formData[key]);
         }
       });
@@ -216,8 +221,12 @@ const WrestlerForm = () => {
       // Redirect based on creation/edit context
       if (isCreatingFreeAgent) {
         navigate('/free-agents');
+      } else if (response.data.contract && response.data.contract.company) {
+        // If wrestler has a company, go to that company's roster
+        navigate(`/roster/${response.data.contract.company}`);
       } else {
-        navigate(`/roster/${formData.companyId}`);
+        // If wrestler is a free agent
+        navigate('/free-agents');
       }
     } catch (err) {
       console.error('Error saving wrestler:', err);
@@ -264,6 +273,9 @@ const WrestlerForm = () => {
       </div>
     );
   }
+
+  // Check if editing a free agent as an admin
+  const isEditingFreeAgentAsAdmin = id && user && user.isAdmin && wrestler && (!wrestler.contract || !wrestler.contract.company);
 
   return (
     <div className="container my-4">
@@ -527,81 +539,84 @@ const WrestlerForm = () => {
                 
                 <h4>Contract Details</h4>
                 
-                {isCreatingFreeAgent ? (
+                {isCreatingFreeAgent || isEditingFreeAgentAsAdmin ? (
                   <div className="alert alert-info">
-                    <strong>Creating a Free Agent</strong>
-                    <p>This wrestler will not be assigned to any company initially.</p>
-                    <p>Users can sign this free agent to their companies later.</p>
+                    {isEditingFreeAgentAsAdmin ? 
+                      <strong>Editing a Free Agent</strong> :
+                      <strong>Creating a Free Agent</strong>}
+                    <p>You can leave the company field empty to keep this wrestler as a free agent.</p>
                   </div>
-                ) : (
-                  <>
-                    <div className="mb-3">
-                      <label htmlFor="companyId" className="form-label">Company *</label>
-                      <select
-                        className="form-select"
-                        id="companyId"
-                        name="companyId"
-                        value={formData.companyId}
-                        onChange={handleChange}
-                        required={!isCreatingFreeAgent}
-                        disabled={id && wrestler?.contract?.company} // Can't change company when editing contracted wrestler
-                      >
-                        <option value="">Select a company</option>
-                        {companies.map(company => (
-                          <option key={company._id} value={company._id}>
-                            {company.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div className="mb-3">
-                      <label htmlFor="salary" className="form-label">Salary ($)</label>
+                ) : null}
+                
+                <div className="mb-3">
+                  <label htmlFor="companyId" className="form-label">
+                    Company {isEditingFreeAgentAsAdmin ? '(Optional)' : '*'}
+                  </label>
+                  <select
+                    className="form-select"
+                    id="companyId"
+                    name="companyId"
+                    value={formData.companyId}
+                    onChange={handleChange}
+                    required={!isCreatingFreeAgent && !isEditingFreeAgentAsAdmin}
+                    disabled={id && wrestler?.contract?.company && !user?.isAdmin} // Can't change company when editing contracted wrestler, unless admin
+                  >
+                    <option value="">
+                      {isEditingFreeAgentAsAdmin ? 'No Company (Free Agent)' : 'Select a company'}
+                    </option>
+                    {companies.map(company => (
+                      <option key={company._id} value={company._id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="mb-3">
+                  <label htmlFor="salary" className="form-label">Salary ($)</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    id="salary"
+                    name="salary"
+                    min="10000"
+                    step="5000"
+                    value={formData.salary}
+                    onChange={handleChange}
+                  />
+                </div>
+                
+                <div className="row mb-3">
+                  <div className="col-md-6">
+                    <label htmlFor="contractLength" className="form-label">Contract Length (months)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      id="contractLength"
+                      name="contractLength"
+                      min="1"
+                      max="60"
+                      value={formData.contractLength}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  
+                  <div className="col-md-6">
+                    <div className="form-check mt-4">
                       <input
-                        type="number"
-                        className="form-control"
-                        id="salary"
-                        name="salary"
-                        min="10000"
-                        step="5000"
-                        value={formData.salary}
+                        className="form-check-input"
+                        type="checkbox"
+                        id="exclusive"
+                        name="exclusive"
+                        checked={formData.exclusive}
                         onChange={handleChange}
                       />
+                      <label className="form-check-label" htmlFor="exclusive">
+                        Exclusive Contract
+                      </label>
                     </div>
-                    
-                    <div className="row mb-3">
-                      <div className="col-md-6">
-                        <label htmlFor="contractLength" className="form-label">Contract Length (months)</label>
-                        <input
-                          type="number"
-                          className="form-control"
-                          id="contractLength"
-                          name="contractLength"
-                          min="1"
-                          max="60"
-                          value={formData.contractLength}
-                          onChange={handleChange}
-                        />
-                      </div>
-                      
-                      <div className="col-md-6">
-                        <div className="form-check mt-4">
-                          <input
-                            className="form-check-input"
-                            type="checkbox"
-                            id="exclusive"
-                            name="exclusive"
-                            checked={formData.exclusive}
-                            onChange={handleChange}
-                          />
-                          <label className="form-check-label" htmlFor="exclusive">
-                            Exclusive Contract
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -617,7 +632,7 @@ const WrestlerForm = () => {
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={loading || !formData.name || (!isCreatingFreeAgent && !formData.companyId)}
+                disabled={loading || !formData.name || (!isCreatingFreeAgent && !isEditingFreeAgentAsAdmin && !formData.companyId)}
               >
                 {loading ? 'Saving...' : (id ? 'Update Wrestler' : 'Create Wrestler')}
               </button>
