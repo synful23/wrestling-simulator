@@ -1,15 +1,19 @@
 // src/pages/Home.js - Fixed version
-import React from 'react';
+import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { FaFistRaised, FaBuilding, FaCalendarAlt, FaUsers, FaTrophy, FaChartLine } from 'react-icons/fa';
+import { ThemeContext } from '../context/ThemeContext';
 
 const Home = () => {
+  const { theme } = useContext(ThemeContext);
+
   return (
-    <div>
-      {/* Hero Section with inline style instead of CSS background */}
+      <div className={`${theme === 'dark' ? 'bg-dark text-white' : ''}`}>      {/* Hero Section with inline style instead of CSS background */}
       <div style={{
-        background: 'linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8))',
-        color: 'white',
+          background: theme === 'dark' 
+          ? 'linear-gradient(rgba(40,40,40,0.8), rgba(0,0,0,0.8))' 
+          : 'linear-gradient(rgba(255,255,255,0.8), rgba(255,255,255,0.8))',
+        color: theme === 'dark' ? 'white' : 'black',
         textAlign: 'center',
         padding: '5rem 1rem',
         marginTop: '-1.5rem',
@@ -18,7 +22,7 @@ const Home = () => {
         <div className="container">
           <div className="row justify-content-center">
             <div className="col-md-10 text-center">
-              <h1 style={{ fontSize: '3rem', fontWeight: '800', color: 'white', marginBottom: '1rem' }}>
+              <h1 style={{ fontSize: '3rem', fontWeight: '800', color: theme === 'dark' ? 'white' : '#B91C1C', marginBottom: '1rem' }}>
                 <FaBuilding style={{ marginRight: '0.5rem', color: 'white' }} />
                 Wrestling Booking Simulator
               </h1>
@@ -34,7 +38,7 @@ const Home = () => {
                 </Link>
                 <Link
                   to="/companies"
-                  className="btn btn-outline-light btn-lg px-5 py-3 m-2"
+                  className={`btn btn-lg px-5 py-3 m-2 ${theme === 'dark' ? 'btn-outline-light' : 'btn-outline-dark'}`}
                 >
                   View Companies
                 </Link>
@@ -49,17 +53,18 @@ const Home = () => {
         <h2 className="text-center mb-5" style={{ 
           fontWeight: '700', 
           marginBottom: '1.5rem', 
-          paddingBottom: '0.5rem',
-          borderBottom: '2px solid #E2E8F0'
+          paddingBottom: '1.5rem',
+          borderBottom: `2px solid ${theme === 'dark' ? '#212529' : '#E2E8F0'}`,
         }}>
           How It Works
         </h2>
         
         <div className="row g-4">
           <div className="col-md-4 mb-4">
-            <div className="card h-100 shadow-sm" style={{ 
+            <div  className={`card h-100 shadow-sm ${theme === 'dark' ? 'bg-dark text-white' : ''}`} style={{ 
               borderRadius: '0.75rem',
-              transition: 'transform 0.3s, box-shadow 0.3s'
+              transition: 'transform 0.3s, box-shadow 0.3s',
+              borderColor: `${theme === 'dark' ? '#ffffff2d' : '##0000002d'}`,
             }}>
               <div className="card-body p-4 text-center">
                 <div style={{ fontSize: '2.5rem', color: '#B91C1C', marginBottom: '1rem' }}>
@@ -77,9 +82,10 @@ const Home = () => {
           </div>
           
           <div className="col-md-4 mb-4">
-            <div className="card h-100 shadow-sm" style={{ 
+            <div  className={`card h-100 shadow-sm ${theme === 'dark' ? 'bg-dark text-white' : ''}`} style={{ 
               borderRadius: '0.75rem',
-              transition: 'transform 0.3s, box-shadow 0.3s'
+              transition: 'transform 0.3s, box-shadow 0.3s',
+              borderColor: `${theme === 'dark' ? '#ffffff2d' : '##0000002d'}`,
             }}>
               <div className="card-body p-4 text-center">
                 <div style={{ fontSize: '2.5rem', color: '#B91C1C', marginBottom: '1rem' }}>
@@ -97,9 +103,10 @@ const Home = () => {
           </div>
           
           <div className="col-md-4 mb-4">
-            <div className="card h-100 shadow-sm" style={{ 
+            <div  className={`card h-100 shadow-sm ${theme === 'dark' ? 'bg-dark text-white' : ''}`} style={{ 
               borderRadius: '0.75rem',
-              transition: 'transform 0.3s, box-shadow 0.3s'
+              transition: 'transform 0.3s, box-shadow 0.3s',
+              borderColor: `${theme === 'dark' ? '#ffffff2d' : '##0000002d'}`,
             }}>
               <div className="card-body p-4 text-center">
                 <div style={{ fontSize: '2.5rem', color: '#B91C1C', marginBottom: '1rem' }}>
@@ -119,9 +126,10 @@ const Home = () => {
         
         <div className="row g-4 mt-2">
           <div className="col-md-4 mb-4">
-            <div className="card h-100 shadow-sm" style={{ 
+            <div  className={`card h-100 shadow-sm ${theme === 'dark' ? 'bg-dark text-white' : ''}`} style={{ 
               borderRadius: '0.75rem',
-              transition: 'transform 0.3s, box-shadow 0.3s'
+              transition: 'transform 0.3s, box-shadow 0.3s',
+              borderColor: `${theme === 'dark' ? '#ffffff2d' : '##0000002d'}`,
             }}>
               <div className="card-body p-4 text-center">
                 <div style={{ fontSize: '2.5rem', color: '#B91C1C', marginBottom: '1rem' }}>
@@ -139,9 +147,10 @@ const Home = () => {
           </div>
           
           <div className="col-md-4 mb-4">
-            <div className="card h-100 shadow-sm" style={{ 
+            <div  className={`card h-100 shadow-sm ${theme === 'dark' ? 'bg-dark text-white' : ''}`} style={{ 
               borderRadius: '0.75rem',
-              transition: 'transform 0.3s, box-shadow 0.3s'
+              transition: 'transform 0.3s, box-shadow 0.3s',
+              borderColor: `${theme === 'dark' ? '#ffffff2d' : '##0000002d'}`,
             }}>
               <div className="card-body p-4 text-center">
                 <div style={{ fontSize: '2.5rem', color: '#B91C1C', marginBottom: '1rem' }}>
@@ -159,9 +168,10 @@ const Home = () => {
           </div>
           
           <div className="col-md-4 mb-4">
-            <div className="card h-100 shadow-sm" style={{ 
+            <div  className={`card h-100 shadow-sm ${theme === 'dark' ? 'bg-dark text-white' : ''}`} style={{ 
               borderRadius: '0.75rem',
-              transition: 'transform 0.3s, box-shadow 0.3s'
+              transition: 'transform 0.3s, box-shadow 0.3s',
+              borderColor: `${theme === 'dark' ? '#ffffff2d' : '##0000002d'}`,
             }}>
               <div className="card-body p-4 text-center">
                 <div style={{ fontSize: '2.5rem', color: '#B91C1C', marginBottom: '1rem' }}>
@@ -181,13 +191,16 @@ const Home = () => {
       </div>
       
       {/* Getting Started Section */}
-      <div style={{ backgroundColor: '#F8FAFC', padding: '3rem 0' }}>
+      <div style={{
+                backgroundColor: `${theme === 'dark' ? '#212529' : '#f8fafc'}`,
+                padding: '3rem 0' 
+        }}>
         <div className="container">
           <h2 className="text-center mb-5" style={{ 
             fontWeight: '700', 
             marginBottom: '1.5rem', 
             paddingBottom: '0.5rem',
-            borderBottom: '2px solid #E2E8F0'
+            borderBottom: `2px solid ${theme === 'dark' ? '#475569' : '#E2E8F0'}`,
           }}>
             Ready to Start Your Wrestling Empire?
           </h2>
@@ -197,7 +210,7 @@ const Home = () => {
               {/* No image here to avoid dependency issues */}
               <div style={{
                 height: '300px',
-                backgroundColor: '#1E293B',
+                backgroundColor: `${theme === 'dark' ? '#434b59' : '#1E293B'}`,
                 borderRadius: '0.75rem',
                 display: 'flex',
                 alignItems: 'center',
@@ -213,7 +226,7 @@ const Home = () => {
             </div>
             
             <div className="col-md-6">
-              <div className="card border-0 shadow-sm" style={{ borderRadius: '0.75rem' }}>
+              <div className={`card border-0 shadow-sm ${theme === 'dark' ? 'bg-dark text-white' : ''}`} style={{ borderRadius: '0.75rem' }}>
                 <div className="card-body p-4">
                   <h3 className="mb-4">Get Started in Minutes</h3>
                   
