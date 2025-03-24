@@ -24,7 +24,11 @@ const showRoutes = require('./routes/shows');
 
 // Create Express app
 const app = express();
+
 const PORT = process.env.PORT || 5000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
 // Connect to MongoDB
 mongoose
@@ -36,9 +40,8 @@ mongoose
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  origin: '*', // Be careful with this in production
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -66,6 +69,8 @@ require('./config/passport')(passport);
 // Serve static files from uploads directory
 app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log("Serving uploads from:", path.join(__dirname, 'uploads'));
+app.use(express.static(path.join(__dirname, '../client/build')));
+
 
 // Add these debugging endpoints to your server.js file before your existing API routes
 
@@ -84,6 +89,14 @@ app.get('/api/debug/auth', (req, res) => {
       cookie: req.session.cookie,
       // Don't include potentially sensitive data
     } : null
+  });
+});
+
+// In your server/app.js or server.js
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Wrestling Booking Simulator Backend', 
+    status: 'Running' 
   });
 });
 
@@ -206,7 +219,15 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// API routes
+app.get('/api', (req, res) => {
+  res.json({ 
+    message: 'Wrestling Booking Simulator Backend', 
+    status: 'Running' 
+  });
+});
+
+// Catch-all handler to serve React app
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });

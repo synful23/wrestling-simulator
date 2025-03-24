@@ -10,8 +10,8 @@ console.log('API URL configured as:', API_URL);
 
 // Create a custom axios instance
 const api = axios.create({
-  baseURL: API_URL,
-  headers: {
+  baseURL: process.env.REACT_APP_API_URL,
+    headers: {
     'Content-Type': 'application/json'
   },
   withCredentials: true // Important for cookies/session
