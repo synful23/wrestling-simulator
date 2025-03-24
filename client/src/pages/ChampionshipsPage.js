@@ -28,8 +28,8 @@ const getCorrectImageUrl = (imagePath) => {
 };
 
 const ChampionshipsPage = () => {
-  const { companyId } = useParams();
-  const { user } = useContext(AuthContext);
+    const { companyId } = useParams();
+    const { user } = useContext(AuthContext);
   
   const [championships, setChampionships] = useState([]);
   const [company, setCompany] = useState(null);
@@ -44,13 +44,14 @@ const ChampionshipsPage = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
-        // Fetch API endpoint based on whether we have a companyId
+        console.log('Fetching championships for company:', companyId);
+        // If companyId exists, fetch for specific company
         const endpoint = companyId 
           ? `/api/championships/company/${companyId}`
           : '/api/championships';
         
-        const champRes = await axios.get(`${process.env.REACT_APP_API_URL}${endpoint}`);
+          const champRes = await axios.get(`${process.env.REACT_APP_API_URL}${endpoint}`);
+          console.log('Championships fetched:', champRes.data);
         setChampionships(champRes.data);
         
         // If company ID provided, fetch company details
@@ -117,10 +118,10 @@ const ChampionshipsPage = () => {
         </h1>
         
         {isCompanyOwner && (
-          <Link to={`/championships/new${companyId ? `?company=${companyId}` : ''}`} className="btn btn-success">
-            <FaPlus className="me-2" /> Create Championship
-          </Link>
-        )}
+  <Link to={`/championships/new${companyId ? `?company=${companyId}` : ''}`} className="btn btn-success">
+    <FaPlus className="me-2" /> Create Championship
+  </Link>
+)}
       </div>
       
       {error && (

@@ -38,12 +38,34 @@ const isCompanyOwner = async (req, res, next) => {
 // @access  Private - Company Owner
 router.post('/', isAuthenticated, isCompanyOwner, upload.single('image'), async (req, res) => {
   try {
-    const { company, name, description, weight, prestige } = req.body;
 
-    // Validate required fields
-    if (!company || !name) {
-      return res.status(400).json({ message: 'Company and championship name are required' });
-    }
+    console.log('Request body:', req.body);
+    console.log('Uploaded file:', req.file);
+    console.log('User:', req.user);
+
+    const { 
+        company, 
+        name, 
+        description = '', 
+        weight = 'Heavyweight', 
+        prestige = 50, 
+        isActive = true 
+      } = req.body;
+
+    // Validate required fields with more detailed error
+    if (!company) {
+        return res.status(400).json({ 
+          message: 'Company is required',
+          details: { company, name }
+        });
+      }
+  
+      if (!name) {
+        return res.status(400).json({ 
+          message: 'Championship name is required',
+          details: { company, name }
+        });
+      }
 
     // Create the championship
     const championship = new Championship({
@@ -63,9 +85,12 @@ router.post('/', isAuthenticated, isCompanyOwner, upload.single('image'), async 
     await championship.save();
 
     res.status(201).json(championship);
-  } catch (err) {
-    console.error('Error creating championship:', err);
-    res.status(500).json({ message: 'Server error' });
+} catch (err) {
+    console.error('Full error details:', err);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: err.message 
+    });
   }
 });
 
@@ -109,18 +134,16 @@ router.get('/', async (req, res) => {
 // @desc    Get championships for a specific company
 // @access  Public
 router.get('/company/:companyId', async (req, res) => {
-  try {
-    const championships = await Championship.find({ company: req.params.companyId })
-      .populate('company', 'name logo')
-      .populate('currentHolder', 'name image popularity')
-      .sort({ prestige: -1 });
-    
-    res.json(championships);
-  } catch (err) {
-    console.error('Error fetching company championships:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+    try {
+      console.log('Fetching championships for company ID:', req.params.companyId);
+      const championships = await Championship.find({ company: req.params.companyId });
+      console.log('Found championships:', championships);
+      res.json(championships);
+    } catch (err) {
+      console.error('Error fetching company championships:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
 
 // @route   GET /api/championships/:id
 // @desc    Get championship by ID

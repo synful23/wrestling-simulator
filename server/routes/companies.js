@@ -222,7 +222,7 @@ router.delete('/:id', isAuthenticated, async (req, res) => {
     });
     
     // Delete the company
-    await company.remove();
+    await Company.deleteOne({ _id: company._id });
     
     res.json({ message: 'Company deleted successfully' });
   } catch (err) {

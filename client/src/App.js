@@ -88,10 +88,10 @@ function App() {
             <Route path="/championships" element={<ChampionshipsPage />} />
             <Route path="/championships/company/:companyId" element={<ChampionshipsPage />} />
             <Route path="/championships/new" element={
-              <PrivateRoute>
-                <ChampionshipForm />
-              </PrivateRoute>
-            } />
+  <PrivateRoute>
+    <ChampionshipForm />
+  </PrivateRoute>
+} />
             <Route path="/championships/:id" element={<ChampionshipDetail />} />
             <Route path="/championships/:id/edit" element={
               <PrivateRoute>

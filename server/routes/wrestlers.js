@@ -428,4 +428,33 @@ router.post('/:id/release', isAuthenticated, async (req, res) => {
   }
 });
 
+// @route   POST /api/wrestlers/company/:companyId/release
+// @desc    Release all wrestlers from a company
+// @access  Private - Company Owner
+router.post('/company/:companyId/release', isAuthenticated, async (req, res) => {
+  try {
+    const company = await Company.findById(req.params.companyId);
+    
+    if (!company) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+    
+    // Check if user is authorized
+    if (company.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to release these wrestlers' });
+    }
+    
+    // Update all wrestlers from this company to remove their contract
+    await Wrestler.updateMany(
+      { 'contract.company': req.params.companyId },
+      { $unset: { contract: 1 } }
+    );
+    
+    res.json({ message: 'All wrestlers released successfully' });
+  } catch (err) {
+    console.error('Error releasing company wrestlers:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
