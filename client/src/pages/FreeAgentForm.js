@@ -186,6 +186,12 @@ const FreeAgentForm = () => {
         <div className="alert alert-danger">
           Admin access required to manage free agents.
         </div>
+        <button 
+          className="btn btn-secondary"
+          onClick={() => navigate('/free-agents')}
+        >
+          Back to Free Agents
+        </button>
       </div>
     );
   }

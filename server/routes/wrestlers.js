@@ -1,4 +1,4 @@
-// server/routes/wrestlers.js - Optimized version
+// server/routes/wrestlers.js - Admin Check Update
 const express = require('express');
 const router = express.Router();
 const Wrestler = require('../models/Wrestler');
@@ -142,10 +142,11 @@ router.get('/company/:companyId', async (req, res) => {
 });
 
 // @route   POST /api/wrestlers
-// @desc    Create a new wrestler
+// @desc    Create a new wrestler - Admin only access
 // @access  Admin only
 router.post('/', isAdmin, upload.single('image'), async (req, res) => {
   try {
+    console.log('Creating new wrestler - admin only');
     const {
       name,
       gender,
@@ -227,8 +228,8 @@ router.post('/', isAdmin, upload.single('image'), async (req, res) => {
 });
 
 // @route   PUT /api/wrestlers/:id
-// @desc    Update wrestler
-// @access  Admin or owner
+// @desc    Update wrestler - Admin or company owner only
+// @access  Admin or company owner
 router.put('/:id', isAuthenticated, canManageWrestler, upload.single('image'), async (req, res) => {
   try {
     let wrestler = await Wrestler.findById(req.params.id)
@@ -236,6 +237,14 @@ router.put('/:id', isAuthenticated, canManageWrestler, upload.single('image'), a
     
     if (!wrestler) {
       return res.status(404).json({ message: 'Wrestler not found' });
+    }
+    
+    // Check if this is a free agent (no contract company)
+    const isFreeAgent = !wrestler.contract || !wrestler.contract.company;
+
+    // Only admin can edit free agents
+    if (isFreeAgent && !req.user.isAdmin) {
+      return res.status(403).json({ message: 'Only administrators can edit free agents' });
     }
     
     const {
@@ -296,7 +305,6 @@ router.put('/:id', isAuthenticated, canManageWrestler, upload.single('image'), a
       };
     }
     
-
     // Handle image upload
     if (req.file) {
       wrestler.image = `/api/uploads/${req.file.filename}`;
@@ -311,7 +319,7 @@ router.put('/:id', isAuthenticated, canManageWrestler, upload.single('image'), a
 });
 
 // @route   DELETE /api/wrestlers/:id
-// @desc    Delete wrestler
+// @desc    Delete wrestler - Admin only
 // @access  Admin only
 router.delete('/:id', isAdmin, async (req, res) => {
   try {
@@ -390,7 +398,7 @@ router.post('/:id/sign/:companyId', isAuthenticated, async (req, res) => {
 });
 
 // @route   POST /api/wrestlers/:id/release
-// @desc    Release wrestler from contract
+// @desc    Release wrestler from contract - Admin or company owner
 // @access  Company Owner or Admin
 router.post('/:id/release', isAuthenticated, async (req, res) => {
   try {

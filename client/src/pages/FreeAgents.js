@@ -1,9 +1,10 @@
-// src/pages/FreeAgents.js
+// Updated FreeAgents.js
 import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import api from '../utils/api';
 import axios from 'axios';
+import { FaUserPlus, FaFilter, FaSearch, FaSortAmountDown, FaSortAmountUp } from 'react-icons/fa';
 
 const TIMEOUT_MS = 10000; // 10 seconds timeout
 
@@ -180,13 +181,37 @@ const FreeAgents = () => {
       setError(err.response?.data?.message || 'Failed to sign wrestler');
     }
   };
+  
+  // Admin functions
+  const handleCreateFreeAgent = () => {
+    navigate('/admin/wrestlers/new');
+  };
+  
+  const handleEditWrestler = (id) => {
+    navigate(`/wrestlers/edit/${id}`);
+  };
+  
+  const handleDeleteWrestler = async (id) => {
+    try {
+      await api.delete(`/api/wrestlers/${id}`);
+      // Refresh the free agents list
+      const result = await api.get('/api/wrestlers');
+      const freeAgents = result.data.filter(wrestler => !wrestler.contract || !wrestler.contract.company);
+      setWrestlers(freeAgents);
+      
+      alert('Wrestler deleted successfully');
+    } catch (err) {
+      console.error('Error deleting wrestler:', err);
+      setError(err.response?.data?.message || 'Failed to delete wrestler');
+    }
+  };
 
   // Calculate overall rating
   const calculateOverall = (attributes) => {
     return Math.round((attributes.strength + attributes.agility + attributes.charisma + attributes.technical) / 4);
   };
 
-  // Filter and sort wrestlers
+  // Filter wrestlers
   const filteredWrestlers = wrestlers
     .filter(wrestler => 
       wrestler.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -238,10 +263,52 @@ const FreeAgents = () => {
     );
   }
 
+  // Admin Controls Component
+  const AdminControls = ({ wrestler = null }) => {
+    if (!user || !user.isAdmin) return null;
+
+    return (
+      <div className="btn-group">
+        {!wrestler && (
+          <button
+            className="btn btn-success"
+            onClick={handleCreateFreeAgent}
+          >
+            <FaUserPlus className="me-2" /> Create Free Agent
+          </button>
+        )}
+        
+        {wrestler && (
+          <div className="mt-2">
+            <button
+              className="btn btn-sm btn-outline-primary me-2"
+              onClick={() => handleEditWrestler(wrestler._id)}
+            >
+              <i className="fas fa-edit me-1"></i> Edit
+            </button>
+            <button
+              className="btn btn-sm btn-outline-danger"
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to delete ${wrestler.name}?`)) {
+                  handleDeleteWrestler(wrestler._id);
+                }
+              }}
+            >
+              <i className="fas fa-trash me-1"></i> Delete
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="container my-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1>Free Agent Wrestlers</h1>
+        
+        {/* Admin create button */}
+        <AdminControls />
       </div>
       
       {error && (
@@ -255,38 +322,53 @@ const FreeAgents = () => {
         <div className="card-body">
           <div className="row mb-3">
             <div className="col-md-3">
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Search wrestlers..."
-                value={searchTerm}
-                onChange={handleSearchChange}
-              />
+              <div className="input-group">
+                <span className="input-group-text bg-white">
+                  <FaSearch />
+                </span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Search wrestlers..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                />
+              </div>
             </div>
             
             <div className="col-md-2">
-              <select
-                className="form-select"
-                value={filterStyle}
-                onChange={handleStyleChange}
-              >
-                <option value="">All Styles</option>
-                {wrestlingStyles.map(style => (
-                  <option key={style} value={style}>{style}</option>
-                ))}
-              </select>
+              <div className="input-group">
+                <span className="input-group-text bg-white">
+                  <FaFilter />
+                </span>
+                <select
+                  className="form-select"
+                  value={filterStyle}
+                  onChange={handleStyleChange}
+                >
+                  <option value="">All Styles</option>
+                  {wrestlingStyles.map(style => (
+                    <option key={style} value={style}>{style}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             
             <div className="col-md-2">
-              <select
-                className="form-select"
-                value={filterGender}
-                onChange={handleGenderChange}
-              >
-                <option value="">All Genders</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
+              <div className="input-group">
+                <span className="input-group-text bg-white">
+                  <FaFilter />
+                </span>
+                <select
+                  className="form-select"
+                  value={filterGender}
+                  onChange={handleGenderChange}
+                >
+                  <option value="">All Genders</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                </select>
+              </div>
             </div>
             
             <div className="col-md-5 d-flex">
@@ -305,7 +387,7 @@ const FreeAgents = () => {
                 className="btn btn-outline-secondary"
                 onClick={toggleSortOrder}
               >
-                {sortOrder === 'asc' ? '↑' : '↓'}
+                {sortOrder === 'asc' ? <FaSortAmountUp /> : <FaSortAmountDown />}
               </button>
             </div>
           </div>
@@ -313,6 +395,18 @@ const FreeAgents = () => {
           {wrestlers.length === 0 ? (
             <div className="alert alert-info">
               There are no free agents available at this time.
+              
+              {/* Show admin button to create if no wrestlers */}
+              {user && user.isAdmin && (
+                <div className="mt-3">
+                  <button 
+                    className="btn btn-success"
+                    onClick={handleCreateFreeAgent}
+                  >
+                    <FaUserPlus className="me-2" /> Create Free Agent
+                  </button>
+                </div>
+              )}
             </div>
           ) : filteredWrestlers.length === 0 ? (
             <div className="alert alert-warning">
@@ -389,6 +483,11 @@ const FreeAgents = () => {
                         <div title="Charisma" className="me-2"><i className="fas fa-star"></i> {wrestler.attributes.charisma}</div>
                         <div title="Technical" className="me-2"><i className="fas fa-cog"></i> {wrestler.attributes.technical}</div>
                       </div>
+                      
+                      {/* Admin Controls */}
+                      {user && user.isAdmin && (
+                        <AdminControls wrestler={wrestler} />
+                      )}
                     </div>
                     
                     <div className="card-footer d-flex justify-content-between">

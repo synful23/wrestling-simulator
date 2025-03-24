@@ -1,16 +1,18 @@
-// src/pages/WrestlerForm.js
+// src/pages/WrestlerForm.js - Updated to add admin validation
 import React, { useState, useEffect, useContext } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axios from 'axios';
 
 const WrestlerForm = () => {
   const { id } = useParams(); // For editing existing wrestlers
-  // eslint-disable-next-line no-unused-vars
-const { user } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
+  const isCreatingFreeAgent = location.pathname.includes('admin/wrestlers/new');
   
   const [companies, setCompanies] = useState([]);
+  const [wrestler, setWrestler] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [imagePreview, setImagePreview] = useState(null);
@@ -39,45 +41,97 @@ const { user } = useContext(AuthContext);
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch user's companies
-        const companyRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/companies/user`, { withCredentials: true });
-        setCompanies(companyRes.data);
-        
-        // If editing, fetch wrestler data
-        if (id) {
-          const wrestlerRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/wrestlers/${id}`, { withCredentials: true });
-          const wrestler = wrestlerRes.data;
-          
-          setFormData({
-            name: wrestler.name,
-            gender: wrestler.gender,
-            style: wrestler.style,
-            strength: wrestler.attributes.strength,
-            agility: wrestler.attributes.agility,
-            charisma: wrestler.attributes.charisma,
-            technical: wrestler.attributes.technical,
-            popularity: wrestler.popularity,
-            salary: wrestler.salary,
-            companyId: wrestler.contract?.company?._id || '',
-            contractLength: wrestler.contract?.length || 12,
-            exclusive: wrestler.contract?.exclusive || true,
-            hometown: wrestler.hometown || '',
-            age: wrestler.age || 25,
-            experience: wrestler.experience || 0,
-            bio: wrestler.bio || '',
-            signatureMoves: wrestler.signatureMoves?.join(', ') || '',
-            finisher: wrestler.finisher || ''
-          });
-          
-          if (wrestler.image) {
-            setImagePreview(`${process.env.REACT_APP_API_URL}${wrestler.image}`);
+        // If creating a free agent or editing any wrestler, verify admin access
+        if (isCreatingFreeAgent || id) {
+          // For editing any wrestler or creating free agents, check if we can get the data
+          try {
+            if (id) {
+              // Fetch wrestler to see if we have permission
+              const wrestlerRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/wrestlers/${id}`, { withCredentials: true });
+              const fetchedWrestler = wrestlerRes.data;
+              setWrestler(fetchedWrestler);
+              
+              // Check if this is a free agent - if so, we need admin access
+              const isFreeAgent = !fetchedWrestler.contract || !fetchedWrestler.contract.company;
+              
+              // If wrestler is free agent and user is not admin, redirect
+              if (isFreeAgent && (!user || !user.isAdmin)) {
+                setError('Only administrators can edit free agents');
+                setLoading(false);
+                return;
+              }
+              
+              // If user is company owner or admin, allow editing
+              if (user && (user.isAdmin || 
+                 (fetchedWrestler.contract && 
+                  fetchedWrestler.contract.company && 
+                  fetchedWrestler.contract.company.owner === user.id))) {
+                // User has permission to edit this wrestler
+                setFormData({
+                  name: fetchedWrestler.name,
+                  gender: fetchedWrestler.gender,
+                  style: fetchedWrestler.style,
+                  strength: fetchedWrestler.attributes.strength,
+                  agility: fetchedWrestler.attributes.agility,
+                  charisma: fetchedWrestler.attributes.charisma,
+                  technical: fetchedWrestler.attributes.technical,
+                  popularity: fetchedWrestler.popularity,
+                  salary: fetchedWrestler.salary,
+                  companyId: fetchedWrestler.contract?.company?._id || '',
+                  contractLength: fetchedWrestler.contract?.length || 12,
+                  exclusive: fetchedWrestler.contract?.exclusive || true,
+                  hometown: fetchedWrestler.hometown || '',
+                  age: fetchedWrestler.age || 25,
+                  experience: fetchedWrestler.experience || 0,
+                  bio: fetchedWrestler.bio || '',
+                  signatureMoves: fetchedWrestler.signatureMoves?.join(', ') || '',
+                  finisher: fetchedWrestler.finisher || ''
+                });
+                
+                if (fetchedWrestler.image) {
+                  setImagePreview(`${process.env.REACT_APP_API_URL}${fetchedWrestler.image}`);
+                }
+              } else {
+                // User doesn't have permission
+                setError('You do not have permission to edit this wrestler');
+                setLoading(false);
+                return;
+              }
+            } else if (isCreatingFreeAgent && (!user || !user.isAdmin)) {
+              // If creating free agent and not admin, block access
+              setError('Only administrators can create free agents');
+              setLoading(false);
+              return;
+            }
+          } catch (err) {
+            console.error('Error checking permissions:', err);
+            if (err.response?.status === 403) {
+              setError('You do not have permission to access this wrestler');
+            } else {
+              setError('Failed to load wrestler data. Please try again.');
+            }
+            setLoading(false);
+            return;
           }
-        } else if (companyRes.data.length > 0) {
-          // Set default company to first one if creating new wrestler
-          setFormData(prev => ({
-            ...prev,
-            companyId: companyRes.data[0]._id
-          }));
+        }
+        
+        // Fetch user's companies
+        if (user) {
+          const companyRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/companies/user`, { withCredentials: true });
+          setCompanies(companyRes.data);
+          
+          // If creating a wrestler for a company, set default company
+          if (!isCreatingFreeAgent && !id && companyRes.data.length > 0) {
+            // Get company from URL query param if available
+            const urlParams = new URLSearchParams(location.search);
+            const companyIdFromUrl = urlParams.get('company');
+            
+            // Set the company ID from URL or default to first company
+            setFormData(prev => ({
+              ...prev,
+              companyId: companyIdFromUrl || companyRes.data[0]._id
+            }));
+          }
         }
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -88,7 +142,7 @@ const { user } = useContext(AuthContext);
     };
 
     fetchData();
-  }, [id]);
+  }, [id, user, isCreatingFreeAgent, location.search]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -149,7 +203,6 @@ const { user } = useContext(AuthContext);
         );
       } else {
         // Create new wrestler
-                // eslint-disable-next-line no-unused-vars
         response = await axios.post(
           `${process.env.REACT_APP_API_URL}/api/wrestlers`, 
           formDataToSend,
@@ -160,8 +213,12 @@ const { user } = useContext(AuthContext);
         );
       }
 
-      // Redirect to wrestler roster page
-      navigate(`/roster/${formData.companyId}`);
+      // Redirect based on creation/edit context
+      if (isCreatingFreeAgent) {
+        navigate('/free-agents');
+      } else {
+        navigate(`/roster/${formData.companyId}`);
+      }
     } catch (err) {
       console.error('Error saving wrestler:', err);
       setError(err.response?.data?.message || 'Error saving wrestler data');
@@ -170,13 +227,47 @@ const { user } = useContext(AuthContext);
     }
   };
 
-  if (loading && !id) {
+  if (loading) {
     return <div className="text-center mt-5">Loading...</div>;
+  }
+
+  // Show error screen if no permission
+  if (error && (error.includes('permission') || error.includes('administrator'))) {
+    return (
+      <div className="container mt-5">
+        <div className="alert alert-danger">
+          {error}
+        </div>
+        <button 
+          className="btn btn-secondary"
+          onClick={() => navigate(-1)}
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
+  // If creating a free agent but not admin, redirect
+  if (isCreatingFreeAgent && (!user || !user.isAdmin)) {
+    return (
+      <div className="container mt-5">
+        <div className="alert alert-danger">
+          Only administrators can create free agents.
+        </div>
+        <button 
+          className="btn btn-secondary"
+          onClick={() => navigate('/free-agents')}
+        >
+          Back to Free Agents
+        </button>
+      </div>
+    );
   }
 
   return (
     <div className="container my-4">
-      <h1 className="mb-4">{id ? 'Edit Wrestler' : 'Create Wrestler'}</h1>
+      <h1 className="mb-4">{id ? 'Edit Wrestler' : (isCreatingFreeAgent ? 'Create Free Agent' : 'Create Wrestler')}</h1>
       
       {error && (
         <div className="alert alert-danger" role="alert">
@@ -436,72 +527,81 @@ const { user } = useContext(AuthContext);
                 
                 <h4>Contract Details</h4>
                 
-                <div className="mb-3">
-                  <label htmlFor="companyId" className="form-label">Company</label>
-                  <select
-                    className="form-select"
-                    id="companyId"
-                    name="companyId"
-                    value={formData.companyId}
-                    onChange={handleChange}
-                  >
-                    {companies.length === 0 ? (
-                      <option value="">No companies available</option>
-                    ) : (
-                      companies.map(company => (
-                        <option key={company._id} value={company._id}>
-                          {company.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-                
-                <div className="mb-3">
-                  <label htmlFor="salary" className="form-label">Salary ($)</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    id="salary"
-                    name="salary"
-                    min="10000"
-                    step="5000"
-                    value={formData.salary}
-                    onChange={handleChange}
-                  />
-                </div>
-                
-                <div className="row mb-3">
-                  <div className="col-md-6">
-                    <label htmlFor="contractLength" className="form-label">Contract Length (months)</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      id="contractLength"
-                      name="contractLength"
-                      min="1"
-                      max="60"
-                      value={formData.contractLength}
-                      onChange={handleChange}
-                    />
+                {isCreatingFreeAgent ? (
+                  <div className="alert alert-info">
+                    <strong>Creating a Free Agent</strong>
+                    <p>This wrestler will not be assigned to any company initially.</p>
+                    <p>Users can sign this free agent to their companies later.</p>
                   </div>
-                  
-                  <div className="col-md-6">
-                    <div className="form-check mt-4">
+                ) : (
+                  <>
+                    <div className="mb-3">
+                      <label htmlFor="companyId" className="form-label">Company *</label>
+                      <select
+                        className="form-select"
+                        id="companyId"
+                        name="companyId"
+                        value={formData.companyId}
+                        onChange={handleChange}
+                        required={!isCreatingFreeAgent}
+                        disabled={id && wrestler?.contract?.company} // Can't change company when editing contracted wrestler
+                      >
+                        <option value="">Select a company</option>
+                        {companies.map(company => (
+                          <option key={company._id} value={company._id}>
+                            {company.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div className="mb-3">
+                      <label htmlFor="salary" className="form-label">Salary ($)</label>
                       <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="exclusive"
-                        name="exclusive"
-                        checked={formData.exclusive}
+                        type="number"
+                        className="form-control"
+                        id="salary"
+                        name="salary"
+                        min="10000"
+                        step="5000"
+                        value={formData.salary}
                         onChange={handleChange}
                       />
-                      <label className="form-check-label" htmlFor="exclusive">
-                        Exclusive Contract
-                      </label>
                     </div>
-                  </div>
-                </div>
+                    
+                    <div className="row mb-3">
+                      <div className="col-md-6">
+                        <label htmlFor="contractLength" className="form-label">Contract Length (months)</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          id="contractLength"
+                          name="contractLength"
+                          min="1"
+                          max="60"
+                          value={formData.contractLength}
+                          onChange={handleChange}
+                        />
+                      </div>
+                      
+                      <div className="col-md-6">
+                        <div className="form-check mt-4">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id="exclusive"
+                            name="exclusive"
+                            checked={formData.exclusive}
+                            onChange={handleChange}
+                          />
+                          <label className="form-check-label" htmlFor="exclusive">
+                            Exclusive Contract
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
             
@@ -517,7 +617,7 @@ const { user } = useContext(AuthContext);
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={loading || !formData.name}
+                disabled={loading || !formData.name || (!isCreatingFreeAgent && !formData.companyId)}
               >
                 {loading ? 'Saving...' : (id ? 'Update Wrestler' : 'Create Wrestler')}
               </button>

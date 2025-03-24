@@ -1,54 +1,60 @@
-// middleware/auth.js
-// Authentication and authorization middleware
+// Authentication middleware
 
-// Check if user is authenticated middleware
 const isAuthenticated = (req, res, next) => {
-    if (req.isAuthenticated()) {
-      return next();
-    }
-    return res.status(401).json({ message: 'Unauthorized' });
-  };
-  
-  // Check if user is an admin
-  const isAdmin = (req, res, next) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-    
-    if (!req.user.isAdmin) {
-      return res.status(403).json({ message: 'Admin access required' });
-    }
-    
+  if (req.isAuthenticated()) {
     return next();
-  };
-  
-  // Check if user owns wrestler or is admin
-  const canManageWrestler = async (req, res, next) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-    
-    // If admin, allow access
+  }
+  return res.status(401).json({ message: 'Unauthorized - please log in' });
+};
+
+const isAdmin = (req, res, next) => {
+  if (req.isAuthenticated() && req.user.isAdmin) {
+    return next();
+  }
+  return res.status(403).json({ message: 'Forbidden - admin access required' });
+};
+
+// Middleware to check if user can manage a wrestler
+// Only company owners can manage their wrestlers, and admins can manage any wrestler
+const canManageWrestler = async (req, res, next) => {
+  try {
+    // First check if the user is an admin - admins can manage any wrestler
     if (req.user.isAdmin) {
       return next();
     }
     
-    // Get wrestler ID from params or body
-    const wrestlerId = req.params.id || req.body.wrestlerId;
+    // Get wrestler
+    const Wrestler = require('../models/Wrestler');
+    const wrestler = await Wrestler.findById(req.params.id)
+      .populate('contract.company', 'owner');
     
-    // Check if user has purchased this wrestler
-    const userHasWrestler = req.user.purchasedWrestlers && 
-                           req.user.purchasedWrestlers.some(id => id.toString() === wrestlerId);
-    
-    if (!userHasWrestler) {
-      return res.status(403).json({ message: 'You do not have permission to manage this wrestler' });
+    if (!wrestler) {
+      return res.status(404).json({ message: 'Wrestler not found' });
     }
     
-    return next();
-  };
-  
-  module.exports = {
-    isAuthenticated,
-    isAdmin,
-    canManageWrestler
-  };
+    // If wrestler has no contract or company, only admins can manage them (already checked above)
+    if (!wrestler.contract || !wrestler.contract.company) {
+      return res.status(403).json({ 
+        message: 'Only administrators can manage free agents' 
+      });
+    }
+    
+    // Check if user is the company owner
+    if (wrestler.contract.company.owner.toString() !== req.user.id) {
+      return res.status(403).json({ 
+        message: 'Not authorized to manage this wrestler' 
+      });
+    }
+    
+    next();
+  } catch (err) {
+    console.error('Error in canManageWrestler middleware:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = {
+  isAuthenticated,
+  isAdmin,
+  canManageWrestler
+};
